@@ -9,4 +9,4 @@ files<-files[1:10] # this is just to keep it to a manageable size
 #1.  for each monitoring session, create a dataframe with household, village, session id, and arm variables
 #(note that to create the arm variable we will need to map from village codes to arm -- DJ has the look-up table)
 #(for now, want to create a dataframe for each exposure monitoring session file; later we may need to stack them)
-#2.  create a more manageable name for each data
+#2.  create a more manageable name for each dataframe 
