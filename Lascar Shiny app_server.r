@@ -1,5 +1,5 @@
 ########## LASCAR SHINY APP ##########
-######### UPDATED NOV 7, 2013 #########
+######### UPDATED NOV 26, 2013 #########
 
 require(shiny)
 require(ggplot2)
@@ -20,8 +20,8 @@ shinyServer(function(input, output) {
     timezone <- input$timezone
     dir <- input$dir
     
- 
-  
+    
+    
     Sys.setenv(TZ = timezone)
     
     inFile <- input$file1
@@ -46,14 +46,18 @@ shinyServer(function(input, output) {
     
     data2 <- (data2[data2$Time >= start_time & data2$Time <= stop_time,])
     
-    firstdate <- floor_date(data2$Time[1], unit = "day")
-
-    ID <- paste(subject, firstdate, session, serialnumber, sep = "_")
+    # new
+    
+    start_time <- format(start_time, format = "%d%b%y %H:%M:%S")
+    stop_time <- format(stop_time, format = "%d%b%y %H:%M:%S")
+    lastdate <- floor_date(data2$Time[nrow(data2)], unit = "day")
+    
+    ID <- paste(subject, format(lastdate, format = "%d%b%y"), session, serialnumber, sep = "_")
     
     
     data2$unique_min = floor_date(data2$Time, unit = "minute")  
     data2$unique_hour = floor_date(data2$Time, unit = "hour")  
-
+    
     
     ###### SUBSETTING DATA INTO 24-HOUR PERIODS #####
     
@@ -68,12 +72,12 @@ shinyServer(function(input, output) {
       data2$unique_24h <- ifelse ((data2$unique_min > dayindex[i]),  i+1, data2$unique_24h)
     } 
     
-
-  ########### CALCULATING MINUTE, HOUR, AND 24-HOUR AVERAGES ###########
+    
+    ########### CALCULATING MINUTE, HOUR, AND 24-HOUR AVERAGES ###########
     
     minute.average = ddply(data2, .(unique_min), summarise, 
                            CO.ppm = round(mean(CO.ppm., na.rm=TRUE), digits = 2))
-                           
+    
     
     hour.average = ddply(data2, .(unique_hour), summarise, 
                          CO.ppm = round(mean(CO.ppm., na.rm=TRUE), digits = 2))
@@ -82,10 +86,10 @@ shinyServer(function(input, output) {
                          CO.ppm = round(mean(CO.ppm., na.rm=TRUE),digits = 2),
                          Date_time = unique_min[1],
                          total_hours_observation = round(length(unique_min)/360, digits = 1))  
-   
+    
     ####### MINUTE AVERAGE DATA ############################
     
-     # minute.average$Permanent_ID <- rep(permID)
+    # minute.average$Permanent_ID <- rep(permID)
     minute.average$Subject <- rep(subject)
     minute.average$Session <- rep(session)
     minute.average <- minute.average[,c(3:4,1:2)]
@@ -112,18 +116,21 @@ shinyServer(function(input, output) {
     average_CO <- round(mean(data2$CO.ppm), digits = 2)
     median_CO <- median(data2$CO.ppm)
     min_CO <- min(data2$CO.ppm)
-      
+    pct75_CO <- as.numeric(quantile(data2$CO.ppm, 0.75))
+    pct95_CO <- as.numeric(quantile(data2$CO.ppm, 0.95))
+    max_CO <- max(data2$CO.ppm)
+    
     
     ###### COLLATING TO SUMMARY ######
     
-    Value <- c(serialnumber, round(total_time, digits = 1), as.character(start_time), as.character(stop_time), timezone, average_CO, median_CO, min_CO)
-    Parameter <-  c("Lascar Serialnumber", "Total Sampling Time (Hours)", "Start Time", "Stop Time", "Timezone", "Mean Sample CO reading (ppm)", "Median Sample CO reading (ppm)", "Minimum Sample CO reading (ppm)")
+    Value <- c(serialnumber, round(total_time, digits = 1), as.character(start_time), as.character(stop_time), timezone, average_CO, median_CO, min_CO, pct75_CO, pct95_CO, max_CO)
+    Parameter <-  c("Lascar Serialnumber", "Total Sampling Time (Hours)", "Start Time", "Stop Time", "Timezone", "Mean Sampled CO (ppm)", "Median Sampled CO (ppm)", "Minimum Sampled CO (ppm)", "75th percentile CO (ppm)", "95th percentile CO (ppm)", "Max Sampled CO (ppm)")
     
     
     data_summary <- cbind(Parameter, Value)
     data_summary <- data.frame(data_summary, stringsAsFactors = FALSE)
     
-
+    
     summary <- rbind.fill(data_summary, day.average)
     # summary$Permanent_ID <- rep(permID)
     summary$Subject <- rep(subject)
@@ -132,13 +139,13 @@ shinyServer(function(input, output) {
     
     info <- list(dir = dir, ID = ID, summary = summary, short_summary = data_summary, minutedata = minute.average, hourdata = hour.average, daydata = day.average)
     return(info)
-  
+    
   })
   
   
   ############## OUTPUT TO WEB VIEWER ####################
   
-theme_set(theme_grey(16))
+  theme_set(theme_grey(16))
   
   output$summary <- renderPrint({
     short_summary <- Data()$short_summary
@@ -156,12 +163,12 @@ theme_set(theme_grey(16))
     print(ggplot(data=Data()$hourdata)+ geom_line(aes(unique_hour,CO.ppm), color="blue") + labs(title=paste("Hour-Averaged CO \n", Data()$ID)) + scale_x_datetime(labels = date_format("%a %b %d %H")) + xlab("Date")+ ylab("CO (ppm)") + expand_limits(y=0) +  theme(plot.title=element_text(size=rel(0.92), color = "darkgrey")))
   })
   
-
+  
   output$day_CO <- renderPlot({
     if (is.null(input$file1)) { return() }
     print(ggplot(data=Data()$daydata)+ geom_bar(aes(unique_24h,CO.ppm), fill="aquamarine3", stat = "identity") + labs(title=paste("24-Hour Averaged CO \n", Data()$ID))+xlab("Day")+ ylab("CO (ppm)") + geom_text(aes(x=unique_24h, y = max(CO.ppm*4/100), label=paste("Hours:", total_hours_observation)), col = "black") +expand_limits(y=0) +  theme(plot.title=element_text(size=rel(0.92), color = "darkgrey")))
   })
-
+  
   ##### CAPTIONS #######
   
   output$caption1 <- renderText( {
@@ -186,26 +193,26 @@ theme_set(theme_grey(16))
   
   ######### EXPORT 1-MINUTE, 1-HOUR, AND SUMMARY DATA TO CSV and SAVE PLOTS AS PDF #############
   
- 
-    observe({
-      dir <- if (is.null(Data()$dir)) { return() } else dir <- Data()$dir
-      
-      write.csv(Data()$summary, file = file.path(dir, paste(Data()$ID,"_Data_Summary.csv", sep = "")), row.names = F, na = "")
-      write.csv(Data()$minutedata, file = file.path(dir, paste(Data()$ID, "_Data_Minute_Averages.csv", sep = "")), row.names = F) 
-      write.csv(Data()$hourdata, file = file.path(dir, paste(Data()$ID,"_Data_Hour_Averages.csv", sep = "")), row.names=F)
-      
-      pdf(file = file.path(dir, paste(Data()$ID,"_CO_minute_avg.pdf", sep = "")))
-      print(ggplot(data=Data()$minutedata)+ geom_line(aes(unique_min,CO.ppm), color="blue") + labs(title=paste("Minute-Averaged CO \n", Data()$ID))+xlab("Date")+ ylab("CO (ppm)") + scale_x_datetime(breaks = date_breaks("1 day"), labels = date_format("%a %b %d %H")) + expand_limits(y=0) +  theme(plot.title=element_text(size=rel(0.92), color = "darkgrey")))
-     dev.off()
-      
-      pdf(file = file.path(dir, paste(Data()$ID,"_CO_hour_avg.pdf", sep = "")))
-      print(ggplot(data=Data()$hourdata)+ geom_line(aes(unique_hour,CO.ppm), color="blue") + labs(title=paste("Hour-Averaged CO \n", Data()$ID))+xlab("Date")+ ylab("CO (ppm)") + scale_x_datetime(breaks = date_breaks("1 day"), labels = date_format("%a %b %d %H"))+ expand_limits(y=0) +  theme(plot.title=element_text(size=rel(0.92), color = "darkgrey")))
-      dev.off()
-      
-      pdf(file = file.path(dir, paste(Data()$ID,"_CO_24hour_avg.pdf", sep = "")))
-      print(ggplot(data=Data()$daydata)+ geom_bar(aes(unique_24h,CO.ppm), fill="aquamarine3", stat = "identity") + labs(title=paste("24-Hour Averaged CO \n", Data()$ID))+xlab("Day")+ ylab("CO (ppm)") + geom_text(aes(x=unique_24h, y = max(CO.ppm*4/100), label=paste("Hours:", total_hours_observation)), col = "black") + expand_limits(y=0) +  theme(plot.title=element_text(size=rel(0.92), color = "darkgrey")))
-      dev.off()
-
-    })
+  
+  observe({
+    dir <- if (is.null(Data()$dir)) { return() } else dir <- Data()$dir
+    
+    write.csv(Data()$summary, file = file.path(dir, paste(Data()$ID,"_Data_Summary.csv", sep = "")), row.names = F, na = "")
+    write.csv(Data()$minutedata, file = file.path(dir, paste(Data()$ID, "_Data_Minute_Averages.csv", sep = "")), row.names = F) 
+    write.csv(Data()$hourdata, file = file.path(dir, paste(Data()$ID,"_Data_Hour_Averages.csv", sep = "")), row.names=F)
+    
+    pdf(file = file.path(dir, paste(Data()$ID,"_CO_minute_avg.pdf", sep = "")))
+    print(ggplot(data=Data()$minutedata)+ geom_line(aes(unique_min,CO.ppm), color="blue") + labs(title=paste("Minute-Averaged CO \n", Data()$ID))+xlab("Date")+ ylab("CO (ppm)") + scale_x_datetime(breaks = date_breaks("1 day"), labels = date_format("%a %b %d %H")) + expand_limits(y=0) +  theme(plot.title=element_text(size=rel(0.92), color = "darkgrey")))
+    dev.off()
+    
+    pdf(file = file.path(dir, paste(Data()$ID,"_CO_hour_avg.pdf", sep = "")))
+    print(ggplot(data=Data()$hourdata)+ geom_line(aes(unique_hour,CO.ppm), color="blue") + labs(title=paste("Hour-Averaged CO \n", Data()$ID))+xlab("Date")+ ylab("CO (ppm)") + scale_x_datetime(breaks = date_breaks("1 day"), labels = date_format("%a %b %d %H"))+ expand_limits(y=0) +  theme(plot.title=element_text(size=rel(0.92), color = "darkgrey")))
+    dev.off()
+    
+    pdf(file = file.path(dir, paste(Data()$ID,"_CO_24hour_avg.pdf", sep = "")))
+    print(ggplot(data=Data()$daydata)+ geom_bar(aes(unique_24h,CO.ppm), fill="aquamarine3", stat = "identity") + labs(title=paste("24-Hour Averaged CO \n", Data()$ID))+xlab("Day")+ ylab("CO (ppm)") + geom_text(aes(x=unique_24h, y = max(CO.ppm*4/100), label=paste("Hours:", total_hours_observation)), col = "black") + expand_limits(y=0) +  theme(plot.title=element_text(size=rel(0.92), color = "darkgrey")))
+    dev.off()
+    
+  })
   
 })
