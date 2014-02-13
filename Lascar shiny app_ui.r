@@ -1,5 +1,5 @@
 ############# LASCAR SHINY APP - UI ########
-############ UPDATED NOV 7, 2013 ###########
+############ UPDATED NOV 10, 2013 ###########
 library(shiny)
 
 
@@ -8,7 +8,7 @@ shinyUI(pageWithSidebar(
   headerPanel("Lascar (CO Monitor) Data Analysis"),
   
   sidebarPanel(
-   #  textInput("permID", "What is the Permanent ID?", "PermanentID"),
+    #  textInput("permID", "What is the Permanent ID?", "PermanentID"),
     
     textInput("subject", "What is the Study ID?", "StudyID"),
     
