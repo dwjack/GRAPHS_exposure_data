@@ -5,8 +5,24 @@ head(files)
 
 files<-files[1:10] # this is just to keep it to a manageable size
 
-#next we need a loop that will do the following
-#1.  for each monitoring session, create a dataframe with household, village, session id, and arm variables
-#(note that to create the arm variable we will need to map from village codes to arm -- DJ has the look-up table)
-#(for now, want to create a dataframe for each exposure monitoring session file; later we may need to stack them)
-#2.  create a more manageable name for each dataframe 
+
+require(plyr)
+names(files)<-files #for reasons I don't understand, this forces ldply to include a column with the file name, for parsing below
+all <- ldply(files, read.csv) #this creates a single dataframe 
+
+hhid_pattern<-"BM...."
+hhid_match<-regexpr(hhid_pattern, all$.id)
+all$hhid<-regmatches(all$.id, hhid_match)
+
+vill_pattern<-"vil_.."
+vill_match<-regexpr(vill_pattern, all$.id)
+all$vill<-regmatches(all$.id, vill_match)
+
+session_pattern<-"s_.."
+session_match<-regexpr(session_pattern, all$.id)
+all$session<-regmatches(all$.id, session_match)
+
+
+#next steps
+#     1.  get rid of extraneous variables
+#     2.  
