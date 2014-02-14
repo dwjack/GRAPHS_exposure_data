@@ -39,15 +39,16 @@ session_pattern<-"s_.."
 session_match<-regexpr(session_pattern, CO_stacked$.id)
 CO_stacked$session<-regmatches(CO_stacked$.id, session_match)
 
+#need to recover these variables by modifying the import.lascar function
+# CO_stacked <- rename(CO_stacked, c(CO.ppm.="CO"))
+# CO_stacked <- rename(CO_stacked, c(Serial.Number ="serial_number"))
+# CO_stacked <- rename(CO_stacked, c(Sensor.Life.Expiry="sensor_expiration"))
 
-CO_stacked <- rename(CO_stacked, c(CO.ppm.="CO"))
-CO_stacked <- rename(CO_stacked, c(Serial.Number ="serial_number"))
-CO_stacked <- rename(CO_stacked, c(Sensor.Life.Expiry="sensor_expiration"))
+CO_stacked$hhid<-factor(CO_stacked$hhid)
+CO_stacked$vill<-factor(CO_stacked$vill)
+CO_stacked$session<-factor(CO_stacked$session)
 
-
-keep<-c("Time", "CO", "serial_number", "sensor_expiration", "hhid", "vill", "session" )
-CO_stacked<-CO_stacked[keep] #drop all variables not in the list "keep"
 
 #next steps
-#     1.  get rid of extraneous variables
+
 #     2.  figure out how to apply dplyr magic
