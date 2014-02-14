@@ -12,12 +12,10 @@ for(i in files){
   session_pattern<-"s_.."
   session_match<-regexpr(session_pattern, i)
   session<-regmatches(i, session_match)
+
   
-  print(hhid)
-  print(vill)
-  print(session)
-  
-  
+  name<-paste(hhid, vill, session, sep="_")
+  d <- lapply(i, read.csv) # note that this gives a list of dataframes (i.e., a list )
 }
 
 
