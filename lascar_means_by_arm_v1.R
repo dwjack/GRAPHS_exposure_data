@@ -48,6 +48,8 @@ CO_stacked$hhid<-factor(CO_stacked$hhid)
 CO_stacked$vill<-factor(CO_stacked$vill)
 CO_stacked$session<-factor(CO_stacked$session)
 
+CO_stacked<-as.tbl(CO_stacked)
+by_hhid<-group_by(CO_stacked,hhid)
 
 #next steps
 

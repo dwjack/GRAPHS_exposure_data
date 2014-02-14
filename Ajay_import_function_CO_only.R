@@ -9,11 +9,12 @@ lascar.import <- function(x){
   dt$id1 <- "ek"
   dt$id2 <- "do"
   dt$id3 <- "tiin"
+  dt$rd.datetime <- as.character(round(dt $datetime, 'min'))
+  dt <- ddply(dt,.(variable, rd.datetime, hhid, id1, id2, id3),summarize,value=mean(as.numeric(value),na.rm=T))
+  colnames(dt)[2] <- "datetime"
+  dt$datetime <- ymd_hms(dt$datetime)
   dt
 }
 
 co <- lascar.import(co)
-co$rd.datetime <- as.character(round(co $datetime, 'min'))
-co <- ddply(co,.(variable, rd.datetime, hhid, id1, id2, id3),summarize,value=mean(as.numeric(value),na.rm=T))
-colnames(co)[2] <- "datetime"
-co$datetime <- ymd_hms(co$datetime)
+
