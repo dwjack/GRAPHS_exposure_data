@@ -15,7 +15,13 @@ for(i in files){
 
   
   name<-paste(hhid, vill, session, sep="_")
-  d <- lapply(i, read.csv) # note that this gives a list of dataframes (i.e., a list )
+  d <- lapply(i, read.csv, header=T) # note that this gives a list of dataframes (i.e., a list wherein each element is a datafrome)
+
 }
 
+require(plyr)
+names(files)<-files
+all <- ldply(files, read.csv)
 
+
+######################http://stackoverflow.com/questions/18092102/how-can-i-turn-the-filename-into-a-variable-when-reading-multiple-csvs-into-r
