@@ -51,6 +51,10 @@ CO_stacked$session<-factor(CO_stacked$session)
 CO_stacked<-as.tbl(CO_stacked)
 by_hhid<-group_by(CO_stacked,hhid)
 
+#I don't really understand this syntax, but it seems to work
+#(https://groups.google.com/forum/#!topic/manipulatr/-z28V8UVU9s)
+byhhid<-CO_stacked %.% group_by(hhid) %.% dplyr::summarise(mean(value))
+
 #next steps
 
 #     2.  figure out how to apply dplyr magic
