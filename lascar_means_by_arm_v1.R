@@ -1,6 +1,7 @@
 require(plyr)
 require(dplyr)
-library(reshape)
+require(reshape)
+require(lubridate)
 #create a vector of file names  -- works!!
 files<-list.files("~/Dropbox/ghana_exposure_data_shared_2014/Main_study_exposure_assessment",recursive=T,pattern="^CU_CO", full.names=T)
 head(files)
@@ -29,10 +30,11 @@ hhid_pattern<-"BM...."
 hhid_match<-regexpr(hhid_pattern, CO_stacked$.id)
 CO_stacked$hhid<-regmatches(CO_stacked$.id, hhid_match)
 
-#create village id variable
+#create village id variable - inefficient 2 step process, but works
 vill_pattern<-"vil_.."
 vill_match<-regexpr(vill_pattern, CO_stacked$.id)
 CO_stacked$vill<-regmatches(CO_stacked$.id, vill_match)
+CO_stacked$village_code<-substr(CO_stacked$vill,5,6)
 
 #create session id variable
 session_pattern<-"s_.."
@@ -45,16 +47,23 @@ CO_stacked$session<-regmatches(CO_stacked$.id, session_match)
 # CO_stacked <- rename(CO_stacked, c(Sensor.Life.Expiry="sensor_expiration"))
 
 CO_stacked$hhid<-factor(CO_stacked$hhid)
-CO_stacked$vill<-factor(CO_stacked$vill)
+CO_stacked$village_code<-factor(CO_stacked$village_code)
 CO_stacked$session<-factor(CO_stacked$session)
 
 CO_stacked<-as.tbl(CO_stacked)
 by_hhid<-group_by(CO_stacked,hhid)
 
-#I don't really understand this syntax, but it seems to work
-#(https://groups.google.com/forum/#!topic/manipulatr/-z28V8UVU9s)
-byhhid<-CO_stacked %.% group_by(hhid) %.% dplyr::summarise(mean(value))
 
+#(see https://groups.google.com/forum/#!topic/manipulatr/-z28V8UVU9s)
+#"dplyr::" is required becuase there are other functions called summarise
+
+
+arms <- read.csv("~/Desktop/arms.csv", header=T)
+CO_stacked<- join(CO_stacked,arms,by='village_code')
+
+CO_means<-CO_stacked %.% group_by(arm) %.% dplyr::summarise(mean(value))
 #next steps
 
-#     2.  figure out how to apply dplyr magic
+#   1.  means by arm
+#   2.  average duration
+#   3.  other QC metrics?
