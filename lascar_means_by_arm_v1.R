@@ -4,11 +4,10 @@ require(reshape)
 require(lubridate)
 #create a vector of file names  -- works!!
 files<-list.files("~/Dropbox/ghana_exposure_data_shared_2014/Main_study_exposure_assessment",recursive=T,pattern="^CU_CO", full.names=T)
-head(files)
 
-files<-files[1:10] # this is just to keep it to a manageable size
+#files<-files[1:10] # this is just to keep it to a manageable size
 
-# need to modify the import function so that we retain the sensor expiration date and the 
+# need to modify the import function so that we retain the sensor expiration date, serial # 
 
 lascar.import <- function(x){
   dt <- read.csv(x, stringsAsFactors=F, header=T)[,c(2,3)]
@@ -32,7 +31,7 @@ CO_stacked$hhid<-regmatches(CO_stacked$.id, hhid_match)
 
 #create village id variable - inefficient 2 step process, but works
 vill_pattern<-"vil_.."
-vill_match<-regexpr(vill_pattern, CO_stacked$.id)
+vill_match<-regexpr(vill_pattern, CO_stacked$.id,ignore.case=T)
 CO_stacked$vill<-regmatches(CO_stacked$.id, vill_match)
 CO_stacked$village_code<-substr(CO_stacked$vill,5,6)
 
@@ -41,29 +40,23 @@ session_pattern<-"s_.."
 session_match<-regexpr(session_pattern, CO_stacked$.id)
 CO_stacked$session<-regmatches(CO_stacked$.id, session_match)
 
-#need to recover these variables by modifying the import.lascar function
-# CO_stacked <- rename(CO_stacked, c(CO.ppm.="CO"))
-# CO_stacked <- rename(CO_stacked, c(Serial.Number ="serial_number"))
-# CO_stacked <- rename(CO_stacked, c(Sensor.Life.Expiry="sensor_expiration"))
-
+#convert strings to factors
 CO_stacked$hhid<-factor(CO_stacked$hhid)
 CO_stacked$village_code<-factor(CO_stacked$village_code)
 CO_stacked$session<-factor(CO_stacked$session)
 
+#not sure that this is necessary (for dplyr)
 CO_stacked<-as.tbl(CO_stacked)
-by_hhid<-group_by(CO_stacked,hhid)
-
-
-#(see https://groups.google.com/forum/#!topic/manipulatr/-z28V8UVU9s)
-#"dplyr::" is required becuase there are other functions called summarise
-
 
 arms <- read.csv("~/Desktop/arms.csv", header=T)
 CO_stacked<- join(CO_stacked,arms,by='village_code')
 
-CO_means<-CO_stacked %.% group_by(arm) %.% dplyr::summarise(mean(value))
+#dplyr syntax works nicely, and is *fast*
+CO_means_arm<-CO_stacked %.% group_by(arm) %.% dplyr::summarise(mean(value))
+CO_means_hh_session<-CO_stacked %.% group_by(arm, session, hhid) %.% dplyr::summarise(mean(value), length(value))
+
 #next steps
 
-#   1.  means by arm
+
 #   2.  average duration
 #   3.  other QC metrics?
