@@ -54,7 +54,14 @@ CO_stacked<- join(CO_stacked,arms,by='village_code')
 #dplyr syntax works nicely, and is *fast*
 CO_means_arm<-CO_stacked %.% group_by(arm) %.% dplyr::summarise(mean(value))
 CO_means_hh_session<-CO_stacked %.% group_by(arm, session, hhid) %.% dplyr::summarise(mean(value), length(value))
+CO_means_hh_arm<-CO_stacked %.% group_by(arm, hhid) %.% dplyr::summarise(mean(value), length(value))
+CO_means_hh_arm$arm<-factor(CO_means_hh_arm$arm)
 
+ggplot(CO_means_hh_arm, aes(x=CO_means_hh_arm$length, fill=arm))+geom_density(alpha=.3)+geom_vline(xintercept = 4320)
+ggplot(CO_means_hh_arm, aes(x=CO_means_hh_arm$mean, fill=arm))+geom_density(alpha=.3)
+
+CO_means_hh_arm_trimmed<-subset(CO_means_hh_arm,CO_means_hh_arm$mean<10)
+ggplot(CO_means_hh_arm_trimmed, aes(x=CO_means_hh_arm_trimmed$mean, fill=arm))+geom_density(alpha=.3)
 #next steps
 
 
