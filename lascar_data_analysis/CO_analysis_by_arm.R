@@ -8,7 +8,10 @@ CO_stacked<- join(CO_stacked,arms,by='village_code') #note that arm is numerical
 #dplyr syntax works nicely, and is *fast*
 CO_means_arm<-CO_stacked %.% group_by(arm2) %.% dplyr::summarise(mean(value))
 CO_means_hh_session<-CO_stacked %.% group_by(arm2, session, hhid) %.% dplyr::summarise(mean(value), length(value))
-CO_means_hh_arm<-CO_stacked %.% group_by(arm2, hhid) %.% dplyr::summarise(mean(value), length(value))
+
+#note that session 1 was the pre-intervention session
+CO_means_hh_session_postintervention<-CO_stacked %.% group_by(arm2, session, hhid) %.% dplyr::summarise(mean(value), length(value)) %.% filter(session!="01")
+CO_means_hh_arm_postintervention<-CO_stacked%.% filter(session!="01") %.% group_by(arm2, hhid) %.% dplyr::summarise(mean(value), length(value)) 
 
 #arm has to be a factor for plotting
 CO_means_hh_arm$arm2<-factor(CO_means_hh_arm$arm2) 
@@ -20,11 +23,11 @@ ggplot(CO_means_hh_session, aes(x=CO_means_hh_session$length, fill=arm))+geom_de
 ggplot(CO_means_hh_arm, aes(x=CO_means_hh_arm$mean, fill=arm))+geom_density(alpha=.3)
 
 #plot for means
-CO_means_hh_arm_trimmed<-subset(CO_means_hh_arm,CO_means_hh_arm$mean<10)
+CO_means_hh_arm_trimmed<-subset(CO_means_hh_arm_postintervention,CO_means_hh_arm_postintervention$mean<10)
 ggplot(CO_means_hh_arm_trimmed, aes(x=CO_means_hh_arm_trimmed$mean, fill=arm2))+geom_density(alpha=.3)
 
 # compute the means by arm (after dropping high values)
-CO_means_hh_arm_trimmed<-subset(CO_means_hh_arm,CO_means_hh_arm$mean<10)
+CO_means_hh_arm_trimmed<-subset(CO_means_hh_arm_postintervention,CO_means_hh_arm_postintervention$mean<10)
 names(CO_means_hh_arm_trimmed)<-c("arm2","hhid","value","length")
 CO_means_arm_trimmed<-CO_means_hh_arm_trimmed %.% group_by(arm2) %.% dplyr::summarise(mean(value),length(value))
 CO_means_arm_trimmed

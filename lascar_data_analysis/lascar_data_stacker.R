@@ -39,6 +39,7 @@ CO_stacked$village_code<-substr(CO_stacked$vill,5,6)
 session_pattern<-"s_.."
 session_match<-regexpr(session_pattern, CO_stacked$.id)
 CO_stacked$session<-regmatches(CO_stacked$.id, session_match)
+CO_stacked$session<-substr(CO_stacked$session,3,4)
 
 #convert strings to factors
 CO_stacked$hhid<-factor(CO_stacked$hhid)
@@ -48,22 +49,4 @@ CO_stacked$session<-factor(CO_stacked$session)
 #not sure that this is necessary (for dplyr)
 CO_stacked<-as.tbl(CO_stacked)
 
-arms <- read.csv("~/Desktop/arms.csv", header=T)
-CO_stacked<- join(CO_stacked,arms,by='village_code')
-
-#dplyr syntax works nicely, and is *fast*
-CO_means_arm<-CO_stacked %.% group_by(arm) %.% dplyr::summarise(mean(value))
-CO_means_hh_session<-CO_stacked %.% group_by(arm, session, hhid) %.% dplyr::summarise(mean(value), length(value))
-CO_means_hh_arm<-CO_stacked %.% group_by(arm, hhid) %.% dplyr::summarise(mean(value), length(value))
-CO_means_hh_arm$arm<-factor(CO_means_hh_arm$arm)
-
-ggplot(CO_means_hh_arm, aes(x=CO_means_hh_arm$length, fill=arm))+geom_density(alpha=.3)+geom_vline(xintercept = 4320)
-ggplot(CO_means_hh_arm, aes(x=CO_means_hh_arm$mean, fill=arm))+geom_density(alpha=.3)
-
-CO_means_hh_arm_trimmed<-subset(CO_means_hh_arm,CO_means_hh_arm$mean<10)
-ggplot(CO_means_hh_arm_trimmed, aes(x=CO_means_hh_arm_trimmed$mean, fill=arm))+geom_density(alpha=.3)
-#next steps
-
-
-#   2.  average duration
-#   3.  other QC metrics?
+write.table(CO_stacked, "~/Documents/projects/Biomass_working_group/Ghana_R01/exposure_data_assessment/CO_stacked.txt", sep=",")
