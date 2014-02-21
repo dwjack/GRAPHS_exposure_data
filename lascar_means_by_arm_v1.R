@@ -1,8 +1,9 @@
 require(plyr)
 require(dplyr)
+require(lubridate)
 library(reshape)
 #create a vector of file names  -- works!!
-files<-list.files("~/Dropbox/ghana_exposure_data_shared_2014/Main_study_exposure_assessment",recursive=T,pattern="^CU_CO", full.names=T)
+files<-list.files("~/Dropbox/Main_study_exposure_assessment",recursive=T,pattern="^CU_CO", full.names=T)
 head(files)
 
 files<-files[1:10] # this is just to keep it to a manageable size
@@ -48,9 +49,15 @@ CO_stacked$hhid<-factor(CO_stacked$hhid)
 CO_stacked$vill<-factor(CO_stacked$vill)
 CO_stacked$session<-factor(CO_stacked$session)
 
-CO_stacked<-as.tbl(CO_stacked)
-by_hhid<-group_by(CO_stacked,hhid)
+
+#NEED to disable reshape, lubridate, and plyr in that order in order to implement the code below that uses dplyr functions
+by_hhid<-group_by(CO_stacked, hhid, variable)
+(per_hhid<-summarise(by_hhid, value_mean = round(mean(value, na.rm=TRUE), digits = 3),
+          value_sd = round(sd(value, na.rm=TRUE), digits = 3)))
 
 #next steps
 
 #     2.  figure out how to apply dplyr magic
+
+
+
