@@ -49,4 +49,4 @@ CO_stacked$session<-factor(CO_stacked$session)
 #not sure that this is necessary (for dplyr)
 CO_stacked<-as.tbl(CO_stacked)
 
-write.table(CO_stacked, "~/Documents/projects/Biomass_working_group/Ghana_R01/exposure_data_assessment/CO_stacked.txt", sep=",")
+#write.table(CO_stacked, "~/Documents/projects/Biomass_working_group/Ghana_R01/exposure_data_assessment/CO_stacked.txt", sep=",")
