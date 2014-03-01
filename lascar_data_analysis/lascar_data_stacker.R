@@ -3,8 +3,8 @@ require(dplyr)
 require(reshape)
 require(lubridate)
 #create a vector of file names  -- works!!
-files<-list.files("~/Dropbox/ghana_exposure_data_shared_2014/Main_study_exposure_assessment",recursive=T,pattern="^CU_CO", full.names=T)
-
+files<-list.files("~/Dropbox/ghana_exposure_data_shared_2014/Main_study_exposure_assessment",recursive=T,pattern="^CU_C.", full.names=T)
+length(files)
 #files<-files[1:10] # this is just to keep it to a manageable size
 
 # need to modify the import function so that we retain the sensor expiration date, serial # 
