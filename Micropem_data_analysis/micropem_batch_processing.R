@@ -10,8 +10,8 @@
 
 ### FIND THE LOGSHEETS AND MATCH THEM TO FILES ###
 #create a vector of upem file names  -- works!!
-files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/Main_study_exposure_assessment",recursive=T,pattern="UGF[[:alnum:]]*_[[:alnum:]]*_", full.names=T) # this grabs the preprocessed upem files rather than the raw ones, plus the logsheets
-
+files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/Main_study_exposure_assessment",recursive=T,pattern="UGF[[:alnum:]]*_[[:alnum:]]*_", full.names=T) # this grabs the preprocessed upem files rather than the raw ones, plus the logsheets
+length(files)
 logsheets <- files[grep("logsheet", files)] # separates out the logsheets
 
 files <- files[!(files %in% logsheets)] # removes the logsheets from the files
