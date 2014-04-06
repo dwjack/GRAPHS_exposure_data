@@ -159,8 +159,8 @@ loginfo <- loginfo[!(loginfo$hepa1_ok == FALSE & !is.na(loginfo$hepa1_ok) | logi
 problem_files <- rbind.fill(nodateformat, hepa_problem, no_match)
 
 # save loginfo and problem_files to file
-write.csv(loginfo, file = paste0("loginfo_",Sys.Date(),".csv"))
-write.csv(problem_files, file = paste0("problem_files_", Sys.Date()))
+write.csv(loginfo, file = paste0("loginfo_",Sys.Date(),".csv"), row.names = FALSE)
+write.csv(problem_files, file = paste0("problem_files_", Sys.Date()), row.names = FALSE)
 
 
 
@@ -173,11 +173,19 @@ print(paste0(nrow(problem_files), " files have problems, see the file: problem_f
 ### PROCESS THE GOOD DATA --------
 
 ### CREATING BLANK SUMMARY TABLE ###
-# summary_table <- as.data.frame(matrix(nrow = 0, ncol = 17)) # setting up summary table to capture the info
 
-summary_table <- data.frame(stringsAsFactors = FALSE)
+
+
 
 #### PROCESSING THE DATA #####
+loginfo <- read.csv("~/Dropbox/Ghana project/Ghana R stuff/loginfo_2014-04-05.csv", stringsAsFactors = FALSE) # could be any log file here, make sure stringsAsFactors is set to FALSE
+loginfo <- loginfo[,2:22]
+
+fixed_files <- read.csv("~/Dropbox/Ghana project/Ghana R stuff/MicroPEM_logsheet_data_FIXED 2014-04-06.csv", stringsAsFactors = FALSE)
+loginfo <- rbind.fill(loginfo, fixed_files)
+
+
+summary_table <- data.frame(stringsAsFactors = FALSE)
 
 for (n in 1:nrow(loginfo)) { # would be n in nrow(loginfo)
   
@@ -536,32 +544,55 @@ hepainfo <- rbind(data2.HEPA1, data2.HEPA2, data2.HEPA3)
   
   #### DATA SUMMARY #######
   
-  active.data_summary = matrix(c(as.character(filter),
-                                 serialnumber_full,
-                                 round(total_time), 
-                                 round(total_time_minutes), 
-                                 as.character(start_time), 
-                                 as.character(stop_time),
-                                 timezone,
-                                 round(average_sample_nephelometer, digits = 2), 
-                                 average_sample_nephelometer_hepacorr,
-                                 HEPATIMES, 
-                                 round(HEPA1.nephelometer, digits = 2),
-                                 round(HEPA2.nephelometer, digits = 2),
-                                 compliance_threshold,
-                                 sum(active.minute.average$sd_composite_above_threshold, na.rm=TRUE), 
-                                 round(total_minutes_worn/60),
-                                 round(mean(active.day.average$proportion_compliance_all, na.rm = TRUE)*100, digits =1),
-                                 round(voltage_drop, digits = 2)),
-                               ncol = 1)
+#   active.data_summary = matrix(c(as.character(filter),
+#                                  serialnumber_full,
+#                                  round(total_time), 
+#                                  round(total_time_minutes), 
+#                                  as.character(start_time), 
+#                                  as.character(stop_time),
+#                                  timezone,
+#                                  round(average_sample_nephelometer, digits = 2), 
+#                                  average_sample_nephelometer_hepacorr,
+#                                  HEPATIMES, 
+#                                  round(HEPA1.nephelometer, digits = 2),
+#                                  round(HEPA2.nephelometer, digits = 2),
+#                                  compliance_threshold,
+#                                  sum(active.minute.average$sd_composite_above_threshold, na.rm=TRUE), 
+#                                  round(total_minutes_worn/60),
+#                                  round(mean(active.day.average$proportion_compliance_all, na.rm = TRUE)*100, digits =1),
+#                                  round(voltage_drop, digits = 2)),
+#                                ncol = 1)
+#   
+#   
+#   active.data_summary = data.frame(active.data_summary, stringsAsFactors = FALSE)
+#   active.data_summary$variable = c("Filter", "Serialnumber", "Total Sampling Time (hrs)", "Total Sampling Time (mins)", "Start Time", "Stop Time", "Timezone", "Mean Active Nephelometer (ug/m^3)", "Mean Active Neph, HEPA corr (ug/m^3)", "HEPA1_times (start/stop)", "HEPA2_times (start/stop)",
+#                                    "Mean HEPA1 Nephelometer (ug/m^3)", "Mean HEPA2 Nephelometer (ug/m^3)",  "Compliance Threshold for minutewise SD",
+#                                    "Total Time Composite SD>Threshold (mins)", "Total Hours Worn (hrs)",  "Percent of Hours Worn (%)",  "Avg Voltage Drop per Hour (mV/hr)")  
+#   colnames(active.data_summary)[1] <- "V1"
   
-  
-  active.data_summary = data.frame(active.data_summary, stringsAsFactors = FALSE)
-  active.data_summary$variable = c("Filter", "Serialnumber", "Total Sampling Time (hrs)", "Total Sampling Time (mins)", "Start Time", "Stop Time", "Timezone", "Mean Active Nephelometer (ug/m^3)", "Mean Active Neph, HEPA corr (ug/m^3)", "HEPA1_times (start/stop)", "HEPA2_times (start/stop)",
-                                   "Mean HEPA1 Nephelometer (ug/m^3)", "Mean HEPA2 Nephelometer (ug/m^3)",  "Compliance Threshold for minutewise SD",
-                                   "Total Time Composite SD>Threshold (mins)", "Total Hours Worn (hrs)",  "Percent of Hours Worn (%)",  "Avg Voltage Drop per Hour (mV/hr)")  
-  colnames(active.data_summary)[1] <- "V1"
-  
+active.data_summary2 = data.frame("Filter" = as.character(filter), 
+                                 "Serialnumber" = serialnumber_full, 
+                                 "Total Sampling Time.hrs" = round(total_time), 
+                                 "Total Sampling Time.mins" = round(total_time_minutes),  
+                                 "Start Time" =   as.character(start_time),  
+                                 "Stop Time" =    as.character(stop_time),
+                                 "Timezone" = timezone,
+                                 "Mean Active Nephelometer.ug/m^3" =  round(average_sample_nephelometer, digits = 2), 
+                                 "Mean Active Neph HEPA corr.ug/m^3" = average_sample_nephelometer_hepacorr,
+                                  "HEPA1_times.start/stop" = HEPATIMES[1,1],
+                                 "HEPA2_times.start/stop" = HEPATIMES[2,1],
+                                 "Mean HEPA1 Nephelometer.ug/m^3" = round(HEPA1.nephelometer, digits = 2),
+                                 "Mean HEPA2 Nephelometer.ug/m^3" = round(HEPA2.nephelometer, digits = 2),  
+                                 "Compliance Threshold for minutewise SD" =  compliance_threshold,
+                                 "Total Time Composite SD over Threshold.mins" = sum(active.minute.average$sd_composite_above_threshold, na.rm=TRUE), 
+                                 "Total Hours Worn.hrs" = round(total_minutes_worn/60),
+                                 "Percent of Hours Worn" = round(mean(active.day.average$proportion_compliance_all, na.rm = TRUE)*100, digits =1),  
+                                 "Avg Voltage Drop.mV/hr" = round(voltage_drop, digits = 2))
+
+active.data_summary <- data.frame("variable" = colnames(active.data_summary2), "V1" = t(active.data_summary2))
+
+
+
   
   summary_24 <- as.matrix(t(active.day.average))
   summary_24[2:18,] <- round(as.numeric(summary_24[2:18,]), digits = 2) 
@@ -601,7 +632,7 @@ hepainfo <- rbind(data2.HEPA1, data2.HEPA2, data2.HEPA3)
   # summary$Permanent_ID <- rep(permID)
   summary$Subject <- rep(subject)
   summary$Session <- rep(session)
-  summary <- summary[,c(8,9, 1:7)] # IS THIS THE BEST WAY TO DO THIS (ROW-WISE)?
+  summary <- summary[,c(8,9, 1:7)] 
   
 },
 error = function(e) e
@@ -617,8 +648,16 @@ if(inherits(ErrorHandler, "error")) {
 
 # save the minute data 
 write.csv(active.minute.average.complete, file = paste0(ID, "_Data_Minute_Averages.csv"), row.names = F) 
+by_day_compliance <- as.data.frame(summary_24[20,1:(length(summary_24[20,]) - 1)])
+for (i in 1:ncol(by_day_compliance)) {
+  colnames(by_day_compliance)[i] <- paste0("Day", i, "Compliance.hrs")
+}
 
- summary_table <- rbind(summary_table, t(active.data_summary[,1]))
+
+summary_table_n <- cbind(active.data_summary2, by_day_compliance)
+ summary_table <- rbind.fill(summary_table, summary_table_n)
+
+
 }
 
 
@@ -629,7 +668,7 @@ write.csv(active.minute.average.complete, file = paste0(ID, "_Data_Minute_Averag
 
 
 colnames(summary_table) <- c("Filter", "Serialnumber", "Total Sampling Time (hrs)", "Total Sampling Time (mins)", "Start Time", "Stop Time", "Timezone", "Mean Active Nephelometer (ug/m^3)", "Mean Active Neph, HEPA corr (ug/m^3)", "HEPA1_times (start/stop)", "HEPA2_times (start/stop)", "Mean HEPA1 Nephelometer (ug/m^3)", "Mean HEPA2 Nephelometer (ug/m^3)",  "Compliance Threshold for minutewise SD",
-"Total Time Composite SD>Threshold (mins)", "Total Hours Worn (hrs)",  "Percent of Hours Worn (%)",  "Avg Voltage Drop per Hour (mV/hr)")  
+"Total Time Composite SD>Threshold (mins)", "Total Hours Worn (hrs)",  "Percent of Hours Worn (%)",  "Avg Voltage Drop per Hour (mV/hr)", "Day1Compliance.hrs", "Day2Compliance.hrs", "Day3Compliance.hrs")  
 
 not_processed <- loginfo[!loginfo$Filterid %in% summary_table$Filter,]
 not_processed$problem <- "not processed"
