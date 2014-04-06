@@ -5,26 +5,22 @@
 summary_table2 <- MicroPEM_summary_table_incl_fixed.2014.04.06 # replace with current version
 
 par(mfrow = c(3,2))
-hist(summary_table2[,3], breaks  = 50, col = "grey",xlab = colnames(summary_table2[3]), main = "")
-hist(summary_table2[,8], breaks  = 50, col = "grey",xlab = colnames(summary_table2[8]), main = "")
-hist(summary_table2[,9], breaks  = 50, col = "grey",xlab = colnames(summary_table2[9]), main = "")
-hist(summary_table2[,12], breaks  = 50, col = "grey",xlab = colnames(summary_table2[12]), main = "")
-hist(summary_table2[,13], breaks  = 50, col = "grey",xlab = colnames(summary_table2[13]), main = "")
-hist(summary_table2[,17], breaks  = 50, col = "grey",xlab = colnames(summary_table2[17]), main = "")
+hist(summary_table2[,3], breaks  = 50, col = "red",xlab = colnames(summary_table2[3]), main = "")
+hist(summary_table2[,8], breaks  = 50, col = "red",xlab = colnames(summary_table2[8]), main = "")
+hist(summary_table2[,9], breaks  = 50, col = "red",xlab = colnames(summary_table2[9]), main = "")
+hist(summary_table2[,12], breaks  = 50, col = "red",xlab = colnames(summary_table2[12]), main = "")
+hist(summary_table2[,13], breaks  = 50, col = "red",xlab = colnames(summary_table2[13]), main = "")
+hist(summary_table2[,17], breaks  = 50, col = "red",xlab = colnames(summary_table2[17]), main = "")
 
 summary_table3 <- summary_table2[!summary_table2$Serialnumber == "UGF320423N",]
 summary_table2 <- summary_table3
 
 summary_table3 <- summary_table2[!summary_table2$Filter %in% c("KHC0195", "KHC0245"),]
 summary_table2 <- summary_table3
-par(mfrow = c(3,2))
-plot(summary_table2[,3],xlab = colnames(summary_table2[3]), main = "")
-plot(summary_table2[,8],xlab = colnames(summary_table2[8]), main = "")
-plot(summary_table2[,9],xlab = colnames(summary_table2[9]), main = "")
-plot(summary_table2[,12],xlab = colnames(summary_table2[12]), main = "")
-plot(summary_table2[,13],xlab = colnames(summary_table2[13]), main = "")
-plot(summary_table2[,17],xlab = colnames(summary_table2[17]), main = "")
-
+par(mfrow = c(3,1))
+hist(as.numeric(summary_table[,19]), breaks = 50, col = "red", xlab = colnames(summary_table[19]), main = "")
+hist(as.numeric(summary_table[,20]), breaks = 50, col = "red", xlab = colnames(summary_table[20]), main = "")
+hist(as.numeric(summary_table[,21]), breaks = 50, col = "red", xlab = colnames(summary_table[21]), main = "")
 
 ### Diagnosing problems in problem_files
 
