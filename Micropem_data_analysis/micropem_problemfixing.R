@@ -17,10 +17,12 @@ summary_table2 <- summary_table3
 
 summary_table3 <- summary_table2[!summary_table2$Filter %in% c("KHC0195", "KHC0245"),]
 summary_table2 <- summary_table3
+
+# Compliance per day
 par(mfrow = c(3,1))
-hist(as.numeric(summary_table[,19]), breaks = 50, col = "red", xlab = colnames(summary_table[19]), main = "")
-hist(as.numeric(summary_table[,20]), breaks = 50, col = "red", xlab = colnames(summary_table[20]), main = "")
-hist(as.numeric(summary_table[,21]), breaks = 50, col = "red", xlab = colnames(summary_table[21]), main = "")
+hist(as.numeric(summary_table[,19]), breaks = 50, col = "red", xlab = paste0(colnames(summary_table[19]), " (n=", sum(!is.na(summary_table[19])), ")"), main = "")
+hist(as.numeric(summary_table[,20]), breaks = 50, col = "red", xlab = paste0(colnames(summary_table[20]), " (n=", sum(!is.na(summary_table[20])), ")"), main = "")
+hist(as.numeric(summary_table[,21]), breaks = 50, col = "red", xlab = paste0(colnames(summary_table[21]), " (n=", sum(!is.na(summary_table[21])), ")"), main = "")
 
 ### Diagnosing problems in problem_files
 

@@ -433,7 +433,7 @@ hepainfo <- rbind(data2.HEPA1, data2.HEPA2, data2.HEPA3)
   
   active.hour.average.complete$Subject <- rep(subject)
   active.hour.average.complete$Session <- rep(session)
-  # active.hour.average.complete <- active.hour.average.complete[,c(21:22, 1:20)]
+
   
   ##### ADDING HEPA CORRECTION TO NEPHELOMETER READINGS ####
   ## NOTE: CURRENTLY ONLY SET UP FOR ONE OR TWO HEPA SESSIONS ###
@@ -491,12 +491,7 @@ hepainfo <- rbind(data2.HEPA1, data2.HEPA2, data2.HEPA3)
   
   active.day.average$delta_pressure <- round(tapply(X = active.minute.average.complete$delta_pressure, INDEX = active.minute.average.complete$unique_24h, FUN  = mean), digits = 2)
   
-  
-  
-  # active.minute.average.complete <- active.minute.average.complete[,c(1:4,28:27, 5:26, 29:30)]
-  
-#   active.hour.average.complete <- active.hour.average.complete[,c(1:4, 24:23, 5:22, 25:26)]
-  
+
   active.day.average$unique_24h <- paste("Day", active.day.average$unique_24h)
   
   
@@ -647,7 +642,9 @@ if(inherits(ErrorHandler, "error")) {
   write.csv(summary, file = paste0(ID,"_MicroPEM_Summary.csv"))
 
 # save the minute data 
-write.csv(active.minute.average.complete, file = paste0(ID, "_Data_Minute_Averages.csv"), row.names = F) 
+write.csv(active.minute.average.complete, file = paste0(ID, "_Data_Minute_Averages.csv"), row.names = F)
+
+# add by-day compliance numbers to the summary
 by_day_compliance <- as.data.frame(summary_24[20,1:(length(summary_24[20,]) - 1)])
 for (i in 1:ncol(by_day_compliance)) {
   colnames(by_day_compliance)[i] <- paste0("Day", i, "Compliance.hrs")
