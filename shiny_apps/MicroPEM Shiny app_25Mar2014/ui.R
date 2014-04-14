@@ -622,6 +622,9 @@ shinyUI(pageWithSidebar(
                plotOutput("compliance")),
       tabPanel("Compliance(24h)", 
                h4(textOutput("caption5")),
-               plotOutput("compliance24"))
+               plotOutput("compliance24")),
+      tabPanel("RH(Min)",
+               h4(textOutput("caption6")),
+               plotOutput("RHplot"))
     ))
 ))

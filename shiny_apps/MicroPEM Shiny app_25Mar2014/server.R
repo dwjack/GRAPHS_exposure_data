@@ -1,8 +1,8 @@
 ############ MICROPEM SHINY APP #########
-############ UPDATED March 25, 2014 ###########
+############ UPDATED April 14, 2014 ###########
 ## New items: 
-# Handling of multiple date formats
-# More user-friendly entry of HEPA information
+# RH plot
+# Troubleshooting lines in summary (mins RH > 92%, mins RH > 100%, mins nephelometer < 0)
 
 
   
@@ -414,10 +414,9 @@ shinyServer(function(input, output) {
     
     #### AVERAGE ACTIVE SAMPLE NEPHELOMETER ####
     
-    average_sample_nephelometer = round(mean(as.numeric(active.data$RH.Corrected.Nephelometer), na.rm=TRUE), digits = 2)
-    
-    average_sample_nephelometer_hepacorr <- round(mean(active.day.average$HEPA_corr_neph, na.rm= TRUE), digits = 2)
-    
+average_sample_nephelometer = round(mean(as.numeric(active.minute.average.complete$RH.Corrected.Nephelometer), na.rm=TRUE), digits = 2)
+
+average_sample_nephelometer_hepacorr <- round(mean(active.minute.average.complete$HEPA_corr_neph, na.rm= TRUE), digits = 2)
     ######## HEPA TIMES #####
     HEPATIMES_summary <- as.data.frame(HEPATIMES, stringsAsFactors = FALSE)
     HEPATIMES_summary$variable <- c("HEPA_session1", "HEPA_session2", "HEPA_session3")
@@ -445,17 +444,21 @@ shinyServer(function(input, output) {
                                    round(HEPA2.nephelometer, digits = 2),
                                    round(HEPA3.nephelometer, 	digits = 2),
                                    compliance_threshold,
-                                   sum(active.minute.average$sd_composite_above_threshold, na.rm=TRUE), 
+                                   sum(active.minute.average.complete$sd_composite_above_threshold, na.rm=TRUE), 
                                    round(total_minutes_worn/60),
                                    round(mean(active.day.average$proportion_compliance_all, na.rm = TRUE)*100, digits =1),
-                                   round(voltage_drop, digits = 2)),
+                                   round(voltage_drop, digits = 2),
+                                   nrow(active.minute.average.complete[active.minute.average.complete$RH >92,]),
+                                   nrow(active.minute.average.complete[active.minute.average.complete$RH >100,]),
+                                   nrow(active.minute.average.complete[active.minute.average.complete$RH.Corrected.Nephelometer < 0,]),
+                                   ifelse (!is.na(active.minute.average.complete$HEPA_corr_neph[1]), nrow(active.minute.average.complete[active.minute.average.complete$HEPA_corr_neph < 0,]), NA)),
                                  ncol = 1)
     
     
     active.data_summary = data.frame(active.data_summary, stringsAsFactors = FALSE)
     active.data_summary$variable = c("Total Sampling Time (hrs)", "Total Sampling Time (mins)", "Start Time", "Stop Time", "Timezone", "Mean Active Nephelometer (ug/m^3)", "Mean Active Neph, HEPA corr (ug/m^3)", "HEPA1_times (start/stop)", "HEPA2_times (start/stop)", "HEPA3_times (start/stop)",
                                      "Mean HEPA1 Nephelometer (ug/m^3)", "Mean HEPA2 Nephelometer (ug/m^3)", "Mean HEPA3 Nephelometer (ug/m^3)",  "Compliance Threshold for minutewise SD",
-                                     "Total Time Composite SD>Threshold (mins)", "Total Hours Worn (hrs)",  "Percent of Hours Worn (%)",  "Avg Voltage Drop per Hour (mV/hr)")  
+                                     "Total Time Composite SD>Threshold (mins)", "Total Hours Worn (hrs)",  "Percent of Hours Worn (%)",  "Avg Voltage Drop per Hour (mV/hr)", "Minutes RH > 92pct", "Minutes RH > 100pct", "Minutes Active Neph < 0", "Minutes Active HEPA-corr Neph < 0")  
     colnames(active.data_summary)[1] <- "V1"
     
     
@@ -552,13 +555,23 @@ shinyServer(function(input, output) {
       })
   
   
-  output$compliance24 <- renderPlot({
-    if (is.null(input$file1)) { return() }
-    if (sum(!is.na(Data()$minutedata$sd_composite_rollmean)) >0)
-    print(ggplot(Data()$daydata, aes(x = unique_24h, y = hours_compliance_rollmean)) + geom_bar(stat = "identity", fill = "aquamarine3") + coord_cartesian(ylim = c(0,16)) + xlab ("Day") + ylab("Hours Worn") + labs(title=paste("24-Hour Averaged Wearing Compliance \n", Data()$start_time, "-", Data()$stop_time)) + geom_text(aes(x = unique_24h, y = 2, label = paste(proportion_compliance_all*100, "%", sep = "")), size = 5) + geom_text(aes(x = unique_24h, y = 1, label = paste("of", total_hours_observation, "hrs")), size = 5) + geom_hline(aes(yintercept = 8.5, col = "red"))+  mytheme)
-  })
+#   output$compliance24 <- renderPlot({
+#     if (is.null(input$file1)) { return() }
+#     if (sum(!is.na(Data()$minutedata$sd_composite_rollmean)) >0)
+#     print(ggplot(Data()$daydata, aes(x = unique_24h, y = hours_compliance_rollmean)) + geom_bar(stat = "identity", fill = "aquamarine3") + coord_cartesian(ylim = c(0,16)) + xlab ("Day") + ylab("Hours Worn") + labs(title=paste("24-Hour Averaged Wearing Compliance \n", Data()$start_time, "-", Data()$stop_time)) + geom_text(aes(x = unique_24h, y = 2, label = paste(proportion_compliance_all*100, "%", sep = "")), size = 5) + geom_text(aes(x = unique_24h, y = 1, label = paste("of", total_hours_observation, "hrs")), size = 5) + geom_hline(aes(yintercept = 8.5, col = "red"))+  mytheme)
+#   })
  
-  
+output$compliance24 <- renderPlot({
+  if (is.null(input$file1)) { return() }
+  if (sum(!is.na(Data()$minutedata$sd_composite_rollmean)) >0)
+    print(ggplot(Data()$daydata, aes(x = unique_24h, y = hours_compliance_rollmean)) + geom_bar(stat = "identity", fill = "aquamarine3") + coord_cartesian(ylim = c(0,16)) + xlab ("Day") + ylab("Hours Worn") + labs(title=paste("24-Hour Averaged Wearing Compliance \n", Data()$start_time, "-", Data()$stop_time)) + geom_text(aes(x = unique_24h, y = 2, label = paste(hours_compliance_rollmean, "hrs", sep = " ")), size = 5) + geom_text(aes(x = unique_24h, y = 1, label = paste("of", total_hours_observation, "hrs")), size = 5) + geom_hline(aes(yintercept = 8.5, col = "red"))+  mytheme)
+})
+
+output$RHplot <- renderPlot({
+  if (is.null(input$file1)) { return() }
+  print(ggplot(data=Data()$minutedata) + geom_line(aes(x = unique_min,y = RH), color = "blue") + geom_hline(aes(yintercept = 92), color = "orange") + geom_hline(aes(yintercept = 100), color = "red") + labs(title=paste("Relative Humidity \n", Data()$ID,  "\n", Data()$start_time, "-", Data()$stop_time)) + xlab("Hour") + ylab("RH (%)") + expand_limits(y=c(0,110))  + scale_x_datetime(labels = date_format("%H"), breaks = pretty_breaks(n=10), minor_breaks = NULL) +  mytheme)
+})
+
   ##### CAPTIONS #######
   output$caption1 <- renderText( {
     if (is.null(input$file1)) { return() }
@@ -595,13 +608,10 @@ shinyServer(function(input, output) {
   
   output$caption6 <- renderText( {
     if (is.null(input$file1)) { return() }
-    "Log-Probability Plot"
+    "Minute-Averaged Relative Humidity"
   })
   
-  output$caption7 <- renderText( {
-    if (is.null(input$file1)) { return() }
-    "24-hour Average Nephelometer Readings"
-  })
+
   
   ############ SAVE PLOTS #######################################
   
@@ -664,7 +674,10 @@ shinyServer(function(input, output) {
     print(ggplot(data=Data()$minutedata) + geom_line(aes(x = unique_min,y = Vector.Sum.Composite_mean), color = "blue") + labs(title=paste("Minute-Averaged Vector-Composite Accelerometer \n", Data()$ID,  "\n", Data()$start_time, "-", Data()$stop_time)) + xlab("Hour") + ylab("Vector-Sum Composite (g-unit)") + expand_limits(y=0)  + scale_x_datetime(labels = date_format("%H"), breaks = pretty_breaks(n=10), minor_breaks = NULL) +  mytheme)
     dev.off()
  
-
+    pdf(file = file.path(dir, paste(Data()$ID,"_RH.pdf", sep = "")))
+    print(ggplot(data=Data()$minutedata) + geom_line(aes(x = unique_min,y = RH), color = "blue") + geom_hline(aes(yintercept = 92), color = "orange") + geom_hline(aes(yintercept = 100), color = "red") + labs(title=paste("Relative Humidity \n", Data()$ID,  "\n", Data()$start_time, "-", Data()$stop_time)) + xlab("Hour") + ylab("RH (%)") + expand_limits(y=c(0,110))  + scale_x_datetime(labels = date_format("%H"), breaks = pretty_breaks(n=10), minor_breaks = NULL) +  mytheme)
+    dev.off()
+    
     
     pdf(file = file.path(dir, paste(Data()$ID,"_Pressure_Drop.pdf", sep = "")))
     par(oma=c(0,2,0,3))
