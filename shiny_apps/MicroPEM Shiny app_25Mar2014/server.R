@@ -3,7 +3,7 @@
 ## New items: 
 # RH plot
 # Troubleshooting lines in summary (mins RH > 92%, mins RH > 100%, mins nephelometer < 0)
-
+# Added text to Rh plot of minutes above 92% and 100%
 
   
 require(shiny)
@@ -561,6 +561,7 @@ average_sample_nephelometer_hepacorr <- round(mean(active.minute.average.complet
 #     print(ggplot(Data()$daydata, aes(x = unique_24h, y = hours_compliance_rollmean)) + geom_bar(stat = "identity", fill = "aquamarine3") + coord_cartesian(ylim = c(0,16)) + xlab ("Day") + ylab("Hours Worn") + labs(title=paste("24-Hour Averaged Wearing Compliance \n", Data()$start_time, "-", Data()$stop_time)) + geom_text(aes(x = unique_24h, y = 2, label = paste(proportion_compliance_all*100, "%", sep = "")), size = 5) + geom_text(aes(x = unique_24h, y = 1, label = paste("of", total_hours_observation, "hrs")), size = 5) + geom_hline(aes(yintercept = 8.5, col = "red"))+  mytheme)
 #   })
  
+# New with hours worn rather than percent
 output$compliance24 <- renderPlot({
   if (is.null(input$file1)) { return() }
   if (sum(!is.na(Data()$minutedata$sd_composite_rollmean)) >0)
@@ -569,7 +570,7 @@ output$compliance24 <- renderPlot({
 
 output$RHplot <- renderPlot({
   if (is.null(input$file1)) { return() }
-  print(ggplot(data=Data()$minutedata) + geom_line(aes(x = unique_min,y = RH), color = "blue") + geom_hline(aes(yintercept = 92), color = "orange") + geom_hline(aes(yintercept = 100), color = "red") + labs(title=paste("Relative Humidity \n", Data()$ID,  "\n", Data()$start_time, "-", Data()$stop_time)) + xlab("Hour") + ylab("RH (%)") + expand_limits(y=c(0,110))  + scale_x_datetime(labels = date_format("%H"), breaks = pretty_breaks(n=10), minor_breaks = NULL) +  mytheme)
+  print(ggplot(data=Data()$minutedata) + geom_line(aes(x = unique_min,y = RH), color = "blue") + geom_hline(aes(yintercept = 92), color = "orange") + geom_hline(aes(yintercept = 100), color = "red") + labs(title=paste("Relative Humidity \n", Data()$ID,  "\n", Data()$start_time, "-", Data()$stop_time)) + xlab("Hour") + ylab("RH (%)") + expand_limits(y=c(-5,110))  + scale_x_datetime(labels = date_format("%H"), breaks = pretty_breaks(n=10), minor_breaks = NULL) +  mytheme + annotate(geom = "text", x= Data()$minutedata$unique_min[100], y = 3, label = paste(Data()$short_summary[20,1], "minutes above 100%"), adj = 0) + annotate(geom = "text", x= Data()$minutedata$unique_min[100], y = -5, label = paste(Data()$short_summary[19,1], "minutes above 92%"), adj = 0))                                                                                                                                                                                                                                                                                                                                                                                                                                 
 })
 
   ##### CAPTIONS #######
@@ -675,7 +676,7 @@ output$RHplot <- renderPlot({
     dev.off()
  
     pdf(file = file.path(dir, paste(Data()$ID,"_RH.pdf", sep = "")))
-    print(ggplot(data=Data()$minutedata) + geom_line(aes(x = unique_min,y = RH), color = "blue") + geom_hline(aes(yintercept = 92), color = "orange") + geom_hline(aes(yintercept = 100), color = "red") + labs(title=paste("Relative Humidity \n", Data()$ID,  "\n", Data()$start_time, "-", Data()$stop_time)) + xlab("Hour") + ylab("RH (%)") + expand_limits(y=c(0,110))  + scale_x_datetime(labels = date_format("%H"), breaks = pretty_breaks(n=10), minor_breaks = NULL) +  mytheme)
+    print(ggplot(data=Data()$minutedata) + geom_line(aes(x = unique_min,y = RH), color = "blue") + geom_hline(aes(yintercept = 92), color = "orange") + geom_hline(aes(yintercept = 100), color = "red") + labs(title=paste("Relative Humidity \n", Data()$ID,  "\n", Data()$start_time, "-", Data()$stop_time)) + xlab("Hour") + ylab("RH (%)") + expand_limits(y=c(0,110))  + scale_x_datetime(labels = date_format("%H"), breaks = pretty_breaks(n=10), minor_breaks = NULL) +  mytheme + annotate(geom = "text", x= Data()$minutedata$unique_min[100], y = 3, label = paste(Data()$short_summary[20,1], "minutes above 100%"), adj = 0) + annotate(geom = "text", x= Data()$minutedata$unique_min[100], y = -5, label = paste(Data()$short_summary[19,1], "minutes above 92%"), adj = 0))
     dev.off()
     
     
