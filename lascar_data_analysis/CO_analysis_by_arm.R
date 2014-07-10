@@ -1,5 +1,6 @@
 # script to generate summary statistics from the lascar data files, by arm
-# assumes that CO_stacked is in memory (run "lascar_means_by_arm.R")
+# Last updated by Darby 5 July 2014
+
 
 
 require(ggplot2) 
@@ -24,6 +25,19 @@ CO_means_hh_session$hours <- CO_means_hh_session$minutes/(60)
 View(CO_means_hh_session)
 
 # diagnostics
+
+# plots of duration
+
+ggplot(CO_means_hh_session, aes(x=CO_means_hh_session$hours))+geom_histogram(binwidth=.1, fill="blue", color="black") + xlab("duration (in hours)")
+
+# by arm
+ggplot(CO_means_hh_session, aes(x=CO_means_hh_session$hours, fill=arm))+geom_density(alpha=.3)+geom_vline(xintercept = 72) + xlab("sampling duration in hours")
+# by session
+ggplot(CO_means_hh_session, aes(x=CO_means_hh_session$hours, fill=session))+geom_density(alpha=.3)+geom_vline(xintercept = 72) + xlab("sampling duration in hours")
+
+
+
+
 sum(is.na(CO_means_hh_session$arm))         #counts how many sessions are missing the arm identifier
 sum(is.na(CO_means_hh_session$co))          #counts how many sessions had missing co data (NA)
 sum(CO_means_hh_session$co==0, na.rm=TRUE)  #counts how many sessions had means of zero
@@ -39,14 +53,6 @@ CO_means_hh_session <- subset(CO_means_hh_session, CO_means_hh_session$hours < 1
 
 
 
-# plots of duration
-
-ggplot(CO_means_hh_session, aes(x=CO_means_hh_session$hours))+geom_histogram(binwidth=.1, fill="blue", color="black") + xlab("mean 72 hour CO")
-
-# by arm
-ggplot(CO_means_hh_session, aes(x=CO_means_hh_session$hours, fill=arm))+geom_density(alpha=.3)+geom_vline(xintercept = 72) + xlab("sampling duration in hours")
-# by session
-ggplot(CO_means_hh_session, aes(x=CO_means_hh_session$hours, fill=session))+geom_density(alpha=.3)+geom_vline(xintercept = 72) + xlab("sampling duration in hours")
 
 # analysis of means by arm
 
