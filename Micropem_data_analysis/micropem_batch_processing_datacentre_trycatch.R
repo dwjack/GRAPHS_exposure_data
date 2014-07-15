@@ -130,12 +130,12 @@ if (!is.na(mdy(data2[1,1]))) {
   loginfo$dateformat[i] <- "dmy" 
   data2$datetime <- dmy_hms(data2$datetime, tz = timezone)
   loginfo$data_start[i] <- data2$datetime[1]
-  loginfo$data_end[i] <-   data2$datetime[nrow(data2)]
+  loginfo$data_end[i] <-   data2$datetime[nrow(data2)-10]
   } else loginfo$dateformat[i] <- NA
 
 if (!is.na(loginfo$dateformat[i])) {
 loginfo$data_start[i] <- data2$datetime[1]
-loginfo$data_end[i] <-   data2$datetime[nrow(data2)]
+loginfo$data_end[i] <-   data2$datetime[nrow(data2)-10]
  
   loginfo$hepa1_ok[i] <- data2$datetime[10] < mdy_hm(paste(loginfo$Fieldsetd[i], loginfo$Thepaoff1[i]), tz = timezone)
   loginfo$hepa2_ok[i] <- data2$datetime[(nrow(data2)-10)] > mdy_hm(paste(loginfo$Pickupdtd[i], loginfo$Thepaon2[i]), tz = timezone)
@@ -158,11 +158,26 @@ loginfo <- loginfo[!(loginfo$hepa1_ok == FALSE & !is.na(loginfo$hepa1_ok) | logi
 # combine the  problem files
 problem_files <- rbind.fill(nodateformat, hepa_problem, no_match)
 
+loginfo$data_start <- as.POSIXct(loginfo$data_start, origin = "1970-1-1")
+loginfo$data_end <- as.POSIXct(loginfo$data_end, origin = "1970-1-1")
+problem_files$data_start <- as.POSIXct(problem_files$data_start, origin = "1970-1-1")
+problem_files$data_end <- as.POSIXct(problem_files$data_end, origin = "1970-1-1")
+
 # save loginfo and problem_files to file
 write.csv(loginfo, file = paste0("loginfo_",Sys.Date(),".csv"), row.names = FALSE)
 write.csv(problem_files, file = paste0("problem_files_", Sys.Date()), row.names = FALSE)
 
+# TO DO - grp the study IDs out of "files" and look for matches with problem_files
+no_match <- problem_files[is.na(problem_files$datafile),]
+no_match$problem <- "no matching datafile"
+no_match$datafile <- as.character(no_match$datafile)
+ID_matched_files <- as.data.frame(files[substr(gsub("^.*BM", "BM", files), 1,7) %in% no_match$Mstudyid], stringsAsFactors = FALSE)
+ID_matched_files[,2] <- substr(gsub("^.*BM", "BM", ID_matched_files[,1]), 1,7)
+colnames(ID_matched_files) <- c("datafile", "Mstudyid")
 
+
+no_match$datafile[no_match$Mstudyid %in% ID_matched_files$Mstudyid] <- ID_matched_files$datafile
+# 2 files found
 
 # Print the number of files with problems
 print(paste0(nrow(problem_files), " files have problems, see the file: problem_files_", Sys.Date()))
@@ -172,17 +187,23 @@ print(paste0(nrow(problem_files), " files have problems, see the file: problem_f
 
 ### PROCESS THE GOOD DATA --------
 
-### CREATING BLANK SUMMARY TABLE ###
-
-
-
-
-#### PROCESSING THE DATA #####
 loginfo <- read.csv("~/Dropbox/Ghana project/Ghana R stuff/loginfo_2014-04-05.csv", stringsAsFactors = FALSE) # could be any log file here, make sure stringsAsFactors is set to FALSE
 loginfo <- loginfo[,2:22]
 
 fixed_files <- read.csv("~/Dropbox/Ghana project/Ghana R stuff/MicroPEM_logsheet_data_FIXED 2014-04-06.csv", stringsAsFactors = FALSE)
 loginfo <- rbind.fill(loginfo, fixed_files)
+
+not_fixed <- read.csv("~/Dropbox/Ghana project/Ghana R stuff/MicroPEM_problem_files_not_fixed 2014-04-06.csv", stringsAsFactors = FALSE)
+
+loginfo <- rbind.fill(loginfo, not_fixed)
+sum(duplicated(loginfo$Filterid))
+loginfo <- loginfo[!duplicated(loginfo$Filterid),] # get rid of duplicates
+
+
+
+
+### CREATING BLANK SUMMARY TABLE ###
+
 
 
 summary_table <- data.frame(stringsAsFactors = FALSE)
@@ -669,7 +690,6 @@ colnames(summary_table) <- c("Filter", "Serialnumber", "Total Sampling Time (hrs
 
 not_processed <- loginfo[!loginfo$Filterid %in% summary_table$Filter,]
 not_processed$problem <- "not processed"
-
 
 problem_files <- rbind(problem_files, not_processed)
 
