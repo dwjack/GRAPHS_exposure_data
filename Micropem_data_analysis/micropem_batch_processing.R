@@ -7,49 +7,49 @@
 
 # NOTE any problems in the files will cause the script to stop running.
 
-
 ### FIND THE LOGSHEETS AND MATCH THEM TO FILES ###
 #create a vector of upem file names  -- works!!
-files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/Main_study_exposure_assessment",recursive=T,pattern="UGF[[:alnum:]]*_[[:alnum:]]*_", full.names=T) # this grabs the preprocessed upem files rather than the raw ones, plus the logsheets
-length(files)
+files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/",recursive=T,pattern="UGF[[:alnum:]]*_[[:alnum:]]*_", full.names=T) # this grabs the preprocessed upem files rather than the raw ones, plus the logsheets
+
 logsheets <- files[grep("logsheet", files)] # separates out the logsheets
 
 files <- files[!(files %in% logsheets)] # removes the logsheets from the files
+length(files)
 
-# set up a data frame for the logsheet info
-loginfo <- as.data.frame(logsheets)
-loginfo[,2] <- substr(gsub("^.*BM", "BM", loginfo[,1]), 1,6)
-loginfo[,3] <- substr(gsub("^.*UGF", "UGF", loginfo[,1]), 1,10)
-loginfo[,4] <- substr(gsub("^.*KHC", "KHC", loginfo[,1]), 1,7)
-loginfo[,5:11] <- NA
-loginfo[,8] <- substr(gsub("^.*BM", "BM", loginfo[,1]), 9,15)
-colnames(loginfo) <- c("filename", "id", "serial", "filter", "date1", "hepa1_start", "hepa1_end", "date2", "hepa2_start", "hepa2_end", "comments")
+# # set up a data frame for the logsheet info
+# loginfo <- as.data.frame(logsheets)
+# loginfo[,2] <- substr(gsub("^.*BM", "BM", loginfo[,1]), 1,6)
+# loginfo[,3] <- substr(gsub("^.*UGF", "UGF", loginfo[,1]), 1,10)
+# loginfo[,4] <- substr(gsub("^.*KHC", "KHC", loginfo[,1]), 1,7)
+# loginfo[,5:11] <- NA
+# loginfo[,8] <- substr(gsub("^.*BM", "BM", loginfo[,1]), 9,15)
+# colnames(loginfo) <- c("filename", "id", "serial", "filter", "date1", "hepa1_start", "hepa1_end", "date2", "hepa2_start", "hepa2_end", "comments")
+# 
+# 
+# matched_files <- as.data.frame(files[substr(gsub("^.*KHC", "KHC", files), 1,7) %in% loginfo$filter])
+# matched_files[,2] <- substr(gsub("^.*KHC", "KHC", matched_files[,1]), 1,7)
+# colnames(matched_files) <- c("datafile", "filter")
+# loginfo <- merge(loginfo, matched_files, by = "filter", all = TRUE)
+# 
+# # have to fill in the rest by hand, so export it. Note - "import" data into excel and format all columns as "text"
+# write.csv(loginfo, file = "loginfo.csv")
+# 
+# # fill it in by hand then re-import it
+# new_loginfo<-list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)",recursive=T,pattern="loginfo.*csv", full.names=T) 
+# new_loginfo # check that this is the correct file
 
-
-matched_files <- as.data.frame(files[substr(gsub("^.*KHC", "KHC", files), 1,7) %in% loginfo$filter])
-matched_files[,2] <- substr(gsub("^.*KHC", "KHC", matched_files[,1]), 1,7)
-colnames(matched_files) <- c("datafile", "filter")
-loginfo <- merge(loginfo, matched_files, by = "filter", all = TRUE)
-
-# have to fill in the rest by hand, so export it. Note - "import" data into excel and format all columns as "text"
-write.csv(loginfo, file = "loginfo.csv")
-
-# fill it in by hand then re-import it
-new_loginfo<-list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)",recursive=T,pattern="loginfo.*csv", full.names=T) 
-new_loginfo # check that this is the correct file
-
-# import the file
-loginfo <- read.csv(list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)",recursive=T,pattern="loginfo.*csv", full.names=T), stringsAsFactors = F)
-
-
-loginfo$hepatimes1 <- paste0(substr(as.character(dmy_hm(paste(loginfo$date1, loginfo$hepa1_start))), 1,16), "/", (substr(as.character(dmy_hm(paste(loginfo$date1, loginfo$hepa1_end))), 1,16)))
-
-loginfo$hepatimes2 <- paste0(substr(as.character(dmy_hm(paste(loginfo$date2, loginfo$hepa2_start))), 1,16), "/", (substr(as.character(dmy_hm(paste(loginfo$date2, loginfo$hepa2_end))), 1,16)))
-
-loginfo$hepatimes1[grep("NA",loginfo$hepatimes1)] <- NA
-loginfo$hepatimes2[grep("NA",loginfo$hepatimes2)] <- NA
-
-# write.csv(loginfo, file = "upem_loginfo_16feb14.csv")
+# # import the file
+# loginfo <- read.csv(list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)",recursive=T,pattern="loginfo.*csv", full.names=T), stringsAsFactors = F)
+# 
+# 
+# loginfo$hepatimes1 <- paste0(substr(as.character(dmy_hm(paste(loginfo$date1, loginfo$hepa1_start))), 1,16), "/", (substr(as.character(dmy_hm(paste(loginfo$date1, loginfo$hepa1_end))), 1,16)))
+# 
+# loginfo$hepatimes2 <- paste0(substr(as.character(dmy_hm(paste(loginfo$date2, loginfo$hepa2_start))), 1,16), "/", (substr(as.character(dmy_hm(paste(loginfo$date2, loginfo$hepa2_end))), 1,16)))
+# 
+# loginfo$hepatimes1[grep("NA",loginfo$hepatimes1)] <- NA
+# loginfo$hepatimes2[grep("NA",loginfo$hepatimes2)] <- NA
+# 
+# # write.csv(loginfo, file = "upem_loginfo_16feb14.csv")
 
 #### LOADING REQUIRED PACKAGES ####
 
@@ -61,6 +61,60 @@ require(plyr)
 require(scales)
 require(grid)
 require(lubridate)
+
+timezone <- "GMT"
+
+# function to put values in format xx.xx
+timeformat <- function(x){
+  x <- sprintf("%.2f", x)
+  return(x)
+}
+
+# function to replace "0.00" with NA
+zero2na <- function(x){ 
+  z <- gsub("\\s+", "0.00", x)  # "\\s+" means match all
+  x[z=="0.00"] <- NA 
+  return(x)
+}
+
+
+# get logsheet from data centre
+logsheet_data <-  read.csv("~/Dropbox/Ghana project/microPEM_logsheets_through_late_feb_2014.csv", stringsAsFactors = FALSE) # replace filepath with the latest file
+
+# assemble required data from logsheet_data
+# Mstudyid, Upemid, Filterid, Fieldsetd, Thepaon1, Thepaoff1, Pickupdtd, Upemun, NComment, Thepaon2, Thepaoff2, Comments
+loginfo <- logsheet_data[, c(3, 16:17, 25, 27:29, 31:32, 35:36, 41)] 
+
+# format the HEPA session times as needed for xts subsetting
+loginfo[, c(5:6, 10:11)] <- lapply(X = loginfo[, c(5:6, 10:11)], FUN = timeformat)
+loginfo[, c(5:6, 10:11)] <- lapply(X = loginfo[, c(5:6, 10:11)], FUN = zero2na)
+
+
+loginfo$hepatimes1 <- paste0(mdy_hm(paste(loginfo$Fieldsetd, loginfo$Thepaon1)), "/",  mdy_hm(paste(loginfo$Fieldsetd, loginfo$Thepaoff1), tz = timezone))
+loginfo$hepatimes2 <- paste0(mdy_hm(paste(loginfo$Pickupdtd, loginfo$Thepaon2)), "/",  mdy_hm(paste(loginfo$Pickupdtd, loginfo$Thepaoff2), tz = timezone))
+
+loginfo$hepatimes1[grep("NA",loginfo$hepatimes1)] <- NA
+loginfo$hepatimes2[grep("NA",loginfo$hepatimes2)] <- NA
+
+# matching files to loginfo
+matched_files <- as.data.frame(files[substr(gsub("^.*KHC", "KHC", files), 1,7) %in% loginfo$Filterid])
+matched_files[,2] <- substr(gsub("^.*KHC", "KHC", matched_files[,1]), 1,7)
+colnames(matched_files) <- c("datafile", "Filterid")
+loginfo <- merge(loginfo, matched_files, by = "Filterid", all = TRUE)
+
+# print the filter #s that can't be matched to datafiles
+no_match <- loginfo[is.na(loginfo$datafile),]
+if(!is.na(no_match[1,1])) {
+  print("The following filter numbers have no matching datafiles:")
+  print(no_match$Filterid)
+}
+
+# remove the files with no match from loginfo
+loginfo <- loginfo[!is.na(loginfo$datafile),]
+
+# sort loginfo chronologically by date of pickup
+loginfo <- loginfo[order(mdy(loginfo$Pickupdtd)),]
+
 
 #### SETTING COMPLIANCE THRESHOLD #####
 
@@ -74,56 +128,61 @@ blank2na <- function(x){
   return(x)
 }
 
-# ### FOR TESTING - run this part to check start/end times ###
-# for (i in 1:1) {
-#   filter <- loginfo$filter[i]
-#   data <- read.csv(as.character(loginfo$datafile[i]),col.names = c("Date","Time",  "RH.Corrected Nephelometer"  ,"Temp",  "RH",  "Battery",  "Inlet.Press",  "Flow.Orifice.Press",  "Flow",  "X.axis",  "Y.axis",  "Z.axis",  "Vector.Sum.Composite", "Stop.Descriptions"	), header=F, sep=",", fill=T, stringsAsFactors=FALSE) # IMPORTING ACTUAL DATASET INTO R. 
-#   
-#   data_header <- data[1:22,1:7]
-#   colnames(data_header) <- c("variable", "V1", "V2", "V3", "V4", "V5", "V6")
-#   
-#   serialnumber <- paste("PM", as.character(sub("^......", "", data_header[4,2])), sep = "")
-#   
-#   data <- data[25:nrow(data),]  
-#   
-#   stop.desc=data$Stop.Descriptions
-#   stop.desc= cbind(data[,c(1:2)],stop.desc)
-#   stop.desc$stop.desc = as.character(stop.desc$stop.desc)
-#   stop.desc = data.frame(sapply(stop.desc, blank2na), stringsAsFactors = FALSE)
-#   colnames(stop.desc) <- c("V1", "V2", "variable")
-#   stop.desc = stop.desc[complete.cases(stop.desc),]    
-#   stop.desc <- stop.desc[,c(3,1,2)]
-#   
-#   
-#   data.withoutdesc <- data[5:nrow(data), 1:13]
-#   
-#   ######### CREATING DATA2 DATASET - ALL DATA INCLUDING HEPA SESSIONS, RH CORRECTED. #####
-#   
-#   data2 = data.frame(sapply(data.withoutdesc, blank2na))
-#   for(i in 1:11){data2[,i+2] = as.numeric(levels(data2[,i+2]))[as.integer(data2[,i+2])]}
-#   
-#   data2$Date <- as.character(data2$Date)
-#   data2$Time <- as.character(data2$Time)
-#   data2$datetime <- paste(data2$Date, data2$Time)
-#   data2$datetime <- mdy_hms(data2$datetime, tz = timezone)
-#   
-#   
-#   
-#   data2$RH.Corrected.Nephelometer = ifelse(data2$RH <0, NA, data2$RH.Corrected.Nephelometer) # First removes RH corrected if RH < 0
-#   data2$RH[data2$RH < 0] = NA   
-#   
-#   
-#   data2$unique_min <- floor_date(data2$datetime, unit = "minute")
-#   data2$unique_hour <- floor_date(data2$datetime, unit = "hour")
+# ### FOR TESTING - run this part to check alignment of HEPATIMES with data start/end times ###
+for (i in 1:nrow(loginfo)) {
+  filter <- loginfo$Filterid[i]
+  data <- read.csv(as.character(loginfo$datafile[i]),col.names = c("Date","Time",  "RH.Corrected Nephelometer"  ,"Temp",  "RH",  "Battery",  "Inlet.Press",  "Flow.Orifice.Press",  "Flow",  "X.axis",  "Y.axis",  "Z.axis",  "Vector.Sum.Composite", "Stop.Descriptions"	), header=F, sep=",", fill=T, stringsAsFactors=FALSE) # IMPORTING ACTUAL DATASET INTO R. 
+  
+  data_header <- data[1:22,1:7]
+  colnames(data_header) <- c("variable", "V1", "V2", "V3", "V4", "V5", "V6")
+  
+  serialnumber <- paste("PM", as.character(sub("^......", "", data_header[4,2])), sep = "")
+  
+  data <- data[25:nrow(data),]  
+  
+  stop.desc=data$Stop.Descriptions
+  stop.desc= cbind(data[,c(1:2)],stop.desc)
+  stop.desc$stop.desc = as.character(stop.desc$stop.desc)
+  stop.desc = data.frame(sapply(stop.desc, blank2na), stringsAsFactors = FALSE)
+  colnames(stop.desc) <- c("V1", "V2", "variable")
+  stop.desc = stop.desc[complete.cases(stop.desc),]    
+  stop.desc <- stop.desc[,c(3,1,2)]
+  
+  
+  data.withoutdesc <- data[5:nrow(data), 1:13]
+  
+  ######### CREATING DATA2 DATASET - ALL DATA INCLUDING HEPA SESSIONS, RH CORRECTED. #####
+  
+  data2 = data.frame(sapply(data.withoutdesc, blank2na))
+  for(j in 1:11){data2[,j+2] = as.numeric(levels(data2[,j+2]))[as.integer(data2[,j+2])]}
+  
+  data2$Date <- as.character(data2$Date)
+  data2$Time <- as.character(data2$Time)
+  data2$datetime <- paste(data2$Date, data2$Time)
+  data2$datetime <- mdy_hms(data2$datetime, tz = timezone)
+  
+  
+  
+  data2$RH.Corrected.Nephelometer = ifelse(data2$RH <0, NA, data2$RH.Corrected.Nephelometer) # First removes RH corrected if RH < 0
+  data2$RH[data2$RH < 0] = NA   
+  
+  
+  data2$unique_min <- floor_date(data2$datetime, unit = "minute")
+  data2$unique_hour <- floor_date(data2$datetime, unit = "hour")
 #   print(filter)
-#   print(head(data2[,1:2]))
-#   print(tail(data2[,1:2]))
-# }
+#   print(data2[1,1:2])
+#   print(loginfo$hepatimes1[i])
+#   print(data2[nrow(data2),1:2])
+#   print(loginfo$hepatimes2[i])
+  loginfo$data_start[i] <- mdy_hms(paste(data2[1,1], data2[1,2]),tz = timezone)
+  loginfo$data_end[i] <- mdy_hms(paste(data2[nrow(data2),1], data2[nrow(data2),2]), tz = timezone)
+  loginfo$hepa_ok[i] <- mdy_hms(paste(data2[nrow(data2),1], data2[nrow(data2),2])) > mdy_hm(paste(loginfo$Pickupdtd[i], loginfo$Thepaoff2[i]))
+}
 
 
 
 
-
+#### End for testing----
 
 
 ### CREATING BLANK SUMMARY TABLE ###
@@ -131,19 +190,19 @@ summary_table <- as.data.frame(matrix(nrow = 0, ncol = 17)) # setting up summary
 
 #### PROCESSING THE DATA #####
 
-for (i in 36:36) {
+for (i in 1:5) {
   
   HEPATIMES <- matrix(data = NA, nrow = 2, ncol = 1, byrow = TRUE)
-  HEPATIMES[1,1] <- NA
+  HEPATIMES[1,1] <- loginfo$hepatimes1[i]
   HEPATIMES[2,1] <- loginfo$hepatimes2[i]
   
-subject <- loginfo$id[i]
+subject <- loginfo$Mstudyid[i]
 session <- "S_XX" # NOT too useful since all filenames end in "1
-filter <- loginfo$filter[i]
+filter <- loginfo$Filterid[i]
 
 
 
-# window_width <- as.numeric(input$window_width)
+window_width <- 10
 
 Sys.setenv(TZ = timezone)
 
@@ -238,11 +297,6 @@ if(!is.na(HEPATIMES[1,1]))  {
       HEPA2.nephelometer = round(mean(as.numeric(data2.HEPA2_trim$RH.Corrected.Nephelometer), na.rm=TRUE), digits = 2)} else (HEPA2.nephelometer <- NA)
   }}
 
-#     if(i ==3) {
-#       data2.HEPA3_trim = data2.HEPA3[!time(data2.HEPA3) %in%  index(first(data2.HEPA3, '1 minute')) & !time(data2.HEPA3) %in% index(last(data2.HEPA3, '1 minute'))]
-#       data2.HEPA3_trim = as.data.frame(data2.HEPA3_trim, stringsAsFactors = FALSE)
-#       HEPA3.nephelometer = round(mean(as.numeric(data2.HEPA3_trim$RH.Corrected.Nephelometer), na.rm=TRUE), digits = 2)} else (HEPA3.nephelometer <- NA)
-#   }} 
 
 ### CREATING DATASET OF HEPA SESSION INFO ####
 
@@ -563,7 +617,10 @@ hepainfo <- rbind(data2.HEPA1, data2.HEPA2, data2.HEPA3)
   summary <- summary[,c(8,9, 1:7)] # IS THIS THE BEST WAY TO DO THIS (ROW-WISE)?
   
   # save the summary
-  write.csv(summary, file = paste0("MicroPEM_Summary_", ID, ".csv"))
+  write.csv(summary, file = paste0(ID,"_MicroPEM_Summary.csv"))
+# save the minute data 
+write.csv(active.minute.average.complete, file = paste0(ID, "_Data_Minute_Averages.csv"), row.names = F) 
+
  summary_table <- rbind(summary_table, t(active.data_summary[,1]))
 }
 
