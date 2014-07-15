@@ -2,21 +2,23 @@
 
 
 # make summary histograms
-summary_table2 <- MicroPEM_summary_table_incl_fixed.2014.04.06 # replace with current version
+summary_table <- read.csv("~/Dropbox/Ghana project/Ghana R stuff/MicroPEM_summary_table_2014-04-07.csv", stringsAsFactors = FALSE)
 
 par(mfrow = c(3,2))
-hist(summary_table2[,3], breaks  = 50, col = "red",xlab = colnames(summary_table2[3]), main = "")
-hist(summary_table2[,8], breaks  = 50, col = "red",xlab = colnames(summary_table2[8]), main = "")
-hist(summary_table2[,9], breaks  = 50, col = "red",xlab = colnames(summary_table2[9]), main = "")
-hist(summary_table2[,12], breaks  = 50, col = "red",xlab = colnames(summary_table2[12]), main = "")
-hist(summary_table2[,13], breaks  = 50, col = "red",xlab = colnames(summary_table2[13]), main = "")
-hist(summary_table2[,17], breaks  = 50, col = "red",xlab = colnames(summary_table2[17]), main = "")
+hist(summary_table[,3], breaks  = 50, col = "red",xlab = colnames(summary_table[3]), main = "")
+hist(summary_table[,8], breaks  = 50, col = "red",xlab = colnames(summary_table[8]), main = "")
+hist(summary_table[,9], breaks  = 50, col = "red",xlab = colnames(summary_table[9]), main = "")
+hist(summary_table[,12], breaks  = 50, col = "red",xlab = colnames(summary_table[12]), main = "")
+hist(summary_table[,13], breaks  = 50, col = "red",xlab = colnames(summary_table[13]), main = "")
+hist(summary_table[,17], breaks  = 50, col = "red",xlab = colnames(summary_table[17]), main = "")
 
-summary_table3 <- summary_table2[!summary_table2$Serialnumber == "UGF320423N",]
-summary_table2 <- summary_table3
 
-summary_table3 <- summary_table2[!summary_table2$Filter %in% c("KHC0195", "KHC0245"),]
-summary_table2 <- summary_table3
+# removing outliers
+summary_table2 <- summary_table[!summary_table$Serialnumber == "UGF320423N",]
+summary_table <- summary_table2
+
+summary_table2 <- summary_table[!summary_table2$Filter %in% c("KHC0195", "KHC0245"),]
+summary_table <- summary_table2
 
 # Compliance per day
 par(mfrow = c(3,1))
