@@ -31,10 +31,10 @@ colnames(Lascar_data) <- c("mstudyid", "Lascarfile")
 # get rid of files that are actual duplicates (where 2 monitors were deployed simultaneously)
 dupfiles_Lascar <- Lascar_data[grep("dup", Lascar_data[,2]),2] #4
 Lascar_data <- Lascar_data[!Lascar_data$Lascarfile %in% dupfiles_Lascar,] 
-nrow(Lascar_data) #909
+nrow(Lascar_data) #907
 
 
-length(unique(Lascar_data$mstudyid)) #907: compare to above number to see how many duplicates exist (July 14 just BM0328M and BM0583M which each have their own folders)
+length(unique(Lascar_data$mstudyid)) #905: compare to above number to see how many duplicates exist (July 14 just BM0328M and BM0583M which each have their own folders)
 
 
 ## sort out the duplicates before proceeding
@@ -47,14 +47,14 @@ duplicates <- duplicates[order(duplicates$mstudyid),] #sorted
 
 # to remove duplicates that can't be resolved
 Lascar_data <- Lascar_data[!Lascar_data$mstudyid %in% dups,] # remove duplicates
-nrow(Lascar_data) # 905 unique observations
+nrow(Lascar_data) # 903 unique observations
 
 
 # check for child files 
 child <- Lascar_data[grep("BM....C", Lascar_data[,2]),]  # no child files
 
 unmatched_IDs <- StudyIDs[!StudyIDs %in% Lascar_data$mstudyid] #24 of these, including the 2 duplicates. As of Jul 14 all the rest were nonexistent for session 1
-length(unmatched_IDs) #24
+length(unmatched_IDs) #26
 
 files <- as.character(Lascar_data[,2])
 
