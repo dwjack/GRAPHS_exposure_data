@@ -43,7 +43,7 @@ files$duplicate <- grepl("dup", files$files) # note that this assumes that files
 #create date  variable
 #first isolate the file name so that I can pick out the BM string
 
-name_pattern<-"UGF[[:alnum:]]*_KHC[[:alnum:]]*_BM[[:alnum:],[:punct:]]*.csv"
+name_pattern<-"UGF[[:alnum:],[:punct:]]*_BM[[:alnum:],[:punct:]]*.csv"
 name_match<-regexpr(name_pattern, files$files)
 files$name<-regmatches(files$files, name_match)
 
@@ -87,6 +87,7 @@ summary.import <- function(file) {
           flowrow <- grep("Flow..Lpm.", ID$V3)  # identify row with the daily flow data
               df1 <- as.numeric(ID[[flowrow,4]]) # day 1
               df2 <- as.numeric(ID[[flowrow,5]]) # day 2
+                  if (is.na(df2)) {df2 <- 0} else {df2 <- df2}  # convert day 2 to zero if it's missing (otherwise average below will be NA)
               df3 <- as.numeric(ID[[flowrow,6]]) # day 3
                   if (is.na(df3)) {df3 <- 0} else {df3 <- df3}  # convert day 3 to zero if it's missing (otherwise average below will be NA)
               df4 <- as.numeric(ID[[flowrow,7]]) # day 4 (if it exists)
@@ -95,6 +96,7 @@ summary.import <- function(file) {
           timerow <- grep("Active.Sampling.Minutes..mins.", ID$V3)  # identify row with the daily flow data
               dt1 <- as.numeric(ID[[timerow,4]]) # day 1
               dt2 <- as.numeric(ID[[timerow,5]]) # day 2
+                  if (is.na(dt2)) {dt2 <- 0} else {dt2 <- dt2} # convert day 2 to zero if it's missing (otherwise average below will be NA)
               dt3 <- as.numeric(ID[[timerow,6]]) # day 3
                    if (is.na(dt3)) {dt3 <- 0} else {dt3 <- dt3} # convert day 3 to zero if it's missing (otherwise average below will be NA)
               dt4 <- as.numeric(ID[[timerow,7]]) # day 4 (if it exists)
@@ -143,3 +145,8 @@ name <- paste("upem_data",Sys.Date(), sep="_") # this and the next line add the 
 name <- paste(name, "csv", sep=".")
 
 write.csv(upem_data, file=name)
+
+reprocess <- upem_data[!complete.cases(upem_data$ave_flow), c("filter_id", "hhid", "session", "name")]
+
+
+write.csv(reprocess, file="reprocess.csv")
