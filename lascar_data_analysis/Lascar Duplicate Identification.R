@@ -57,7 +57,7 @@ Naming_problems <- Lascar_data1[!is.na(Lascar_data1$problem_id) | !is.na(Lascar_
 
 Naming_problems$problem_id <- as.character(Naming_problems$problem_id)
 Naming_problems$problem_session <- as.character(Naming_problems$problem_session)
-
+Naming_problems <- Naming_problems[order(Naming_problems$mstudyid),]
 
 # save as .csv
 write.csv(Naming_problems, file = paste0("Naming_problems_", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
