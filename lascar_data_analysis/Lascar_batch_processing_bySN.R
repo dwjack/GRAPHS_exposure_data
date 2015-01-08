@@ -243,9 +243,10 @@ COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_process
 length(COfiles) #171
 
 
-CO.parameters <- function(x) {
+CO.parameters <- function(x) { 
   CO_stacked_bySN <- readRDS(x)
-  data <- CO_stacked_bySN %.% group_by(file) %.% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  datetime = datetime[1],  mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE))
+  data <- CO_stacked_bySN %.% group_by(file) %.% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE))
+  data$hours <- round(difftime(data$lastdate, data$firstdate, units = "hours"), digits = 1)
   data
 }
 
