@@ -18,7 +18,7 @@ require(reshape2)
 
 #create vectors of all file names  -----
 files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=T) 
-length(files) #6656 / 6937
+length(files) #6656 / 6937 / Jan 29 7472
 
 # make a data frame of the files
 Lascar_data <- data.frame(file = files, stringsAsFactors = FALSE)
@@ -41,9 +41,9 @@ Lascar_data$lascar <- ifelse(substr(Lascar_data$lascar, start = nchar(Lascar_dat
 
 
 
-length(unique(Lascar_data1$lascar)) # 203
+length(unique(Lascar_data$lascar)) # 207
 
-# match to SNs ----
+# load data to get SNs ----
 
 get.info <- function(x) { ####### read in first row of each data file and extract pertinent info
   dt <- read.csv(x, stringsAsFactors=F, header=T, nrows = 1)[,1:5]
@@ -67,13 +67,14 @@ file_data$lascar_infile <- gsub("\\.", "_", file_data$lascar_infile)
 Lascar_data <- merge(Lascar_data, file_data, by = "file2")
 
 Lascar_data <- Lascar_data[!duplicated(Lascar_data$firstline),] # remove duplicates
-nrow(Lascar_data) #6623
+nrow(Lascar_data) #6623/ Jan 29 7152
 
-# match the CF (pulls the CF from the month of the last day of monitoring)
-cf_new <- readRDS("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factors_bymonth_interp_Dec20.rds")
+# match the CF (pulls the CF from the month of the last day of monitoring) - see "lascar_calibration_take_0.R"
+cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration Factors/calib_factors_bymonth_interp_Jan29.rds")
 for (i in 1:nrow(Lascar_data)){
   cfmatch <- match(Lascar_data$SN[i], cf_new$SN) 
   Lascar_data$cf[i] <- cf_new[cfmatch, names(cf_new) == Lascar_data$monthyear[i]]
+  Lascar_data$cf_conf[i] <- cf_new[cfmatch, names(cf_new) == paste0(Lascar_data$monthyear[i], "_conf")]
 }
 Lascar_data$cf <- as.numeric(Lascar_data$cf)
 
@@ -92,7 +93,7 @@ saveRDS(Lascar_data, file = paste0("Lascar_data_cf_", format(Sys.Date(), format 
 #### OK TO HERE #####
 
 # Lascar.import function -------
-lascar.import <- function(file,cf) { 
+lascar.import <- function(file,cf, cf_conf) { 
   dt <- read.csv(file, stringsAsFactors=F, header=T)[,1:5]
   dt$lascar <- names(dt)[1]
   dt$lascar <- gsub("C0", "CO", dt$lascar)
@@ -100,11 +101,14 @@ lascar.import <- function(file,cf) {
   dt$SN<- dt$Serial.Number[1]
   dt$datetime <- dmy_hms(dt$Time, tz="GMT")
   dt$rd.datetime <- as.character(round(dt$datetime, 'min'))
-  dt<-dt %.% group_by(rd.datetime) %.% dplyr::summarise(mean(CO.ppm.), lascar[1], SN[1]) #replaced the plyr approach that ajay provided w/ ddply
+  dt<-dt %.% group_by(rd.datetime) %.% dplyr::summarise(mean(CO.ppm.), lascar[1], SN[1])
   names(dt) <- c('datetime','co', 'lascar', 'SN')
   dt$datetime <- ymd_hms(dt$datetime)
   dt$cf <- cf
-  dt$co_corr <- dt$co/dt$cf
+  dt$cf_conf <- ifelse(!is.na(dt$cf[1]), cf_conf, "lo") # if CF is NA, set as low
+  cfgood <- !is.na(dt$cf[1]) & dt$cf[1] >=0.2
+  if(cfgood == TRUE) dt$co_corr <- dt$co/dt$cf
+  if(cfgood == FALSE) dt$co_corr <- dt$co/0.85 # if CF is NA or < 0.2,  adjust with the mean
   dt
 }
 
@@ -113,20 +117,20 @@ lascar.import <- function(file,cf) {
 # If working from raw files be sure to comment out section at "START HERE IF WORKING FROM SAVED .RDS DATA
 ## NOTE: THE FOLLOWING STEPS FROM THE RAW DATA TAKE A LONG TIME!
 
-Lascar_data <- readRDS("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/Lascar_data_cf_Dec21.rds")
+Lascar_data <- readRDS("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/Lascar_data_cf_Jan29.rds")
 
 ##################################
 # set a directory for the saved data
-directory <- "~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/20Dec2014/CO_stacked files/"
+directory <- "~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/CO_stacked files/"
 ##################################
 
 
 ptm <- proc.time()
 
-for (i in 1:length(unique(Lascar_data$SN))) { #
-  files_bySN <- Lascar_data[Lascar_data$SN == unique(Lascar_data$SN)[i], c("file", "cf")]
+for (i in 1:length(unique(Lascar_data$SN))) { #1:length(unique(Lascar_data$SN)))
+  files_bySN <- Lascar_data[Lascar_data$SN == unique(Lascar_data$SN)[i], c("file", "cf", "cf_conf")]
   
-  CO_stacked <- mdply(files_bySN, lascar.import, .progress = "text") # mdply so can supply multiple arguments to lascar.import. Variable names of files_bySN must match those in lascar.import (file, cf)
+  CO_stacked <- mdply(files_bySN, lascar.import, .progress = "text") # mdply so can supply multiple arguments to lascar.import. Variable names of files_bySN must match those in lascar.import (file, cf, cf_conf)
   
   CO_stacked <- CO_stacked[!is.na(CO_stacked$co),] # removing NAs
   
@@ -140,8 +144,10 @@ for (i in 1:length(unique(Lascar_data$SN))) { #
   CO_stacked$cstudyid <- ifelse(CO_stacked$cstudyid == -1, NA, substr(x = CO_stacked$file, start = CO_stacked$cstudyid, stop = CO_stacked$cstudyid + 6))
   
   # grab session info
-  session_pattern <- "(s_..|S_..)"
-  CO_stacked$session <- regmatches(CO_stacked$file, regexpr(session_pattern, CO_stacked$file))
+  # grab session info: do in multipe steps to deal with bad value propagation after NA
+  session_pattern <- "(s_[0123456789]{1,2}|s[0123456789]{1,2})"
+  CO_stacked$session <- regmatches(CO_stacked$file, regexpr(session_pattern, CO_stacked$file, ignore.case =TRUE))
+  CO_stacked$session <- tolower(CO_stacked$session)
   
   # order from most recent to oldest
   CO_stacked <- CO_stacked[order(CO_stacked$datetime),]
@@ -159,11 +165,11 @@ for (i in 1:length(unique(Lascar_data$SN))) { #
     #     #  If working from saved .rds data START HERE and run this section thru first print[i], otherwise comment it out along with the print[i] before the loop closure------
     #     
     #     
-    #     savedfiles <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/18Dec2014/CO_stacked files/", full.names = TRUE)
+    # savedfiles <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/CO_stacked files/", full.names = TRUE)
     #     length(savedfiles)
     #     for (i in 1:length(savedfiles)) {
-    #       CO_stacked_bySN <- readRDS(savedfiles[i])
-    #       CO_stacked_bySN <- arrange(CO_stacked_bySN, datetime) # ascending by date
+          #CO_stacked <- readRDS(savedfiles[i])
+      #   CO_stacked <- arrange(CO_stacked, datetime) # ascending by date
     
     #########################
     
@@ -171,8 +177,8 @@ for (i in 1:length(unique(Lascar_data$SN))) { #
     #########################
     # set a directory for the saved plots & a meanCF to use for plots that have no CF
     #########################
-    plotdirectory <- "~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/20Dec2014/Plots by SN/"
-    meancf <- 0.83 #(mean across all units' CFs that were between 0.3 and 1.5 between Feb and Dec 2014)
+    plotdirectory <- "~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/Plots by SN/"
+    meancf <- 0.85 #(mean across all units' CFs that were between 0.6 and 1.2 between Feb and Dec 2014)
     
     
     identifier <- paste("allplots", gsub("\\.", "_", CO_stacked$lascar[1]), CO_stacked$SN[1], sep = "_")
@@ -184,7 +190,7 @@ for (i in 1:length(unique(Lascar_data$SN))) { #
       CO_bysession <- filter(CO_stacked, file == unique(file)[j])
       
       # evaluate parameters
-      cfgood <- !is.na(CO_bysession$cf[1]) & CO_bysession$cf[1] > 0.3 & CO_bysession$cf[1] < 1.5
+      cfgood <- !is.na(CO_bysession$cf[1]) & CO_bysession$cf[1] >=0.2
       mean <- ifelse(cfgood ==TRUE, round(mean(CO_bysession$co_corr, na.rm = TRUE), digits = 2), round(mean(CO_bysession$co/meancf, na.rm = TRUE), digits = 2))
       q90 <-ifelse(cfgood ==TRUE, round(quantile(CO_bysession$co_corr, probs = 0.9, na.rm = TRUE), digits = 2), round(quantile(CO_bysession$co/meancf, probs = 0.9, na.rm = TRUE), digits = 2))
       q98 <- ifelse(cfgood ==TRUE, round(quantile(CO_bysession$co_corr, probs = 0.98, na.rm = TRUE), digits =2), round(quantile(CO_bysession$co/meancf, probs = 0.98, na.rm = TRUE), digits =2))
@@ -194,16 +200,17 @@ for (i in 1:length(unique(Lascar_data$SN))) { #
       
       
       # plot
-      title <- paste(j, CO_bysession$lascar[1], CO_bysession$SN[1], "\n", format(CO_bysession$datetime[1], format = "%b %d %Y"), "CF=", ifelse (cfgood ==TRUE, round(CO_bysession$cf[1], digits = 2), round(meancf, digits = 2)), "\n mean=", mean, " sd=", sd, " q90=", q90, " q98=", q98, "min=", min)
+      title <- paste(j, CO_bysession$lascar[1], CO_bysession$SN[1], "\n", format(CO_bysession$datetime[1], format = "%b %d %Y"), "CF=", round(CO_bysession$cf[1], digits = 2), "CF_conf=", CO_bysession$cf_conf[1], "\n mean=", mean, " sd=", sd, " q90=", q90, " q98=", q98, "min=", min)
       range <- ifelse(cfgood ==TRUE, max(CO_bysession$co_corr), max(CO_bysession$co)/meancf)
       
-      plot(CO_bysession$datetime, CO_bysession$co, type = "l", ylim = c(0, range), main = "" , xlab = paste(CO_bysession$mstudyid[1], CO_bysession$session[1]), ylab = "", lwd = 2, col = "green")
+      plot(CO_bysession$datetime, CO_bysession$co, type = "l", ylim = c(0, range), main = "" , xlab = paste(CO_bysession$mstudyid[1], CO_bysession$session[1]), ylab = "", lwd = 2, col = "black")
       
-      if (cfgood ==TRUE) lines(CO_bysession$datetime, CO_bysession$co_corr, col = alpha("red",0.5), lwd = 2)
-      if (cfgood ==FALSE)  lines(CO_bysession$datetime, CO_bysession$co/meancf, col = alpha("blue", 0.5)) # plot the mean correction in blue if there is no CF for this instrument
+      if (cfgood ==TRUE & CO_bysession$cf_conf[1] == "hi") lines(CO_bysession$datetime, CO_bysession$co_corr, col = alpha("green",0.6), lwd = 2) # blue if hi confidence
+      if (cfgood ==TRUE & CO_bysession$cf_conf[1] == "lo") lines(CO_bysession$datetime, CO_bysession$co_corr, col = alpha("coral",0.6), lwd = 2) # coral if low confidence
+      if (cfgood ==FALSE | CO_bysession$cf_conf[1] == "none")  lines(CO_bysession$datetime, CO_bysession$co/meancf, col = alpha("darkgrey", 0.6), lwd = 2) # plot the mean-corrected values in grey if conf none or if there is no CF for this instrument
       
       mtext("CO (ppm)", side = 2, line = 2, cex = 0.7)
-      legend(x="topright", legend = c(paste("CO, mean = ", round(mean(CO_bysession$co), digits=2)), paste("CO_corr, mean =", ifelse(cfgood ==TRUE, round(mean(CO_bysession$co_corr), digits = 2), round(mean(CO_bysession$co/meancf), digits =2 )))), col = c("green", ifelse(cfgood ==TRUE, "red", "blue")), lwd = 2, cex = 0.9)
+      legend(x="topright", legend = c(paste("CO, mean = ", round(mean(CO_bysession$co), digits=2)), paste("CO_corr, mean =", ifelse(cfgood ==TRUE, round(mean(CO_bysession$co_corr), digits = 2), round(mean(CO_bysession$co/meancf), digits =2 )))), col = c("black", ifelse((cfgood ==TRUE & CO_bysession$cf_conf[1] == "hi"), "green", ifelse((cfgood == TRUE & CO_bysession$cf_conf == "lo"), "coral", "darkgrey"))), lwd = 2, cex = 0.9)
       
       if (invalid == TRUE &!is.na(invalid)) title(main = title,  cex.main = 0.95, col.main = "red") # change title to red if any of the validity criteria are invalid
       if (invalid == FALSE | is.na(invalid)) title(main = title,  cex.main = 0.95)
@@ -231,22 +238,30 @@ proc.time()-ptm
 
 
 
-allplots <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/20Dec2014/Plots by SN/", full.names = TRUE)
-length(allplots) # 171
+allplots <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/Plots by SN/", full.names = TRUE)
+length(allplots) # 174
 
 ####################################################################
 ### Calculating parameters for the saved data-------
 ####################################################################
 # This is generating an equivalent list of NAs?
 
-COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/20Dec2014/CO_stacked files/",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
-length(COfiles) #171
+COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/CO_stacked files/",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
+length(COfiles) #174
 
+# # original
+# CO.parameters <- function(x) { 
+#   CO_stacked_bySN <- readRDS(x)
+#   data <- CO_stacked_bySN %.% group_by(file) %.% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], cf_conf = cf_conf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE))
+#   data$hours <- as.numeric(round(difftime(data$lastdate, data$firstdate, units = "hours"), digits = 1))
+#   data
+# }
 
+# new adding first 24h and first 48h
 CO.parameters <- function(x) { 
   CO_stacked_bySN <- readRDS(x)
-  data <- CO_stacked_bySN %.% group_by(file) %.% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE))
-  data$hours <- round(difftime(data$lastdate, data$firstdate, units = "hours"), digits = 1)
+  data <- CO_stacked_bySN %.% group_by(file) %.% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], cf_conf = cf_conf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE), mean_first24_corr = mean(co_corr[datetime < datetime[1] + hours(24)]), mean_first48_corr = mean(co_corr[datetime < datetime[1] + hours(48)]))
+  data$hours <- as.numeric(round(difftime(data$lastdate, data$firstdate, units = "hours"), digits = 1))
   data
 }
 
@@ -255,8 +270,12 @@ CO_parameters <- ldply(COfiles, CO.parameters, .progress = "text")
 CO_parameters$lascar <- gsub("\\.", "_", CO_parameters$lascar)
 
 
-length(unique(CO_parameters$lascar)) # 207
-length(unique(CO_parameters$SN)) #171
+length(unique(CO_parameters$lascar)) # 210
+length(unique(CO_parameters$SN)) #174
+nrow(CO_parameters) #7152
+
+CO_parameters <- CO_parameters[!is.na(CO_parameters$mean),] # removing NAs
+nrow(CO_parameters) #7152
 
 saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds"))
 
@@ -303,3 +322,71 @@ for (i in 1:length(savedfiles)){ #
   print(i)
 }
 
+## Add validation data in to CO_parameters --------
+## The forms reviewed in the Jan 2015 folder do not have correct CFs so just merge the visual CO validity data:  co_valid, NOTES_NOTES_NOTES, and Validated.by columns
+
+validforms <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/Validation Forms/Reviewed Jan 2015/", full.names = TRUE)
+length(validforms) #171
+
+# load and merge CO validition forms - 
+import.list <- llply(validforms, read.csv) # warnings about "incomplete final lines" are ok?
+CO_validation <- Reduce(function(x, y) merge(x, y, all=T), import.list, accumulate=F)
+
+# check row length
+rows <- 0
+for (i in 1:length(import.list)) { 
+  a <- nrow(import.list[[i]])
+  rows <- sum(rows, a)
+  rows
+}
+rows # 6623
+
+unique(CO_validation$CO_VALID) # check that only contains 1,2,3, and NA. If not, go back to forms and fix!
+
+# merge by "file" in validation files (need to create similar variable in CO_parameters)
+CO_parameters$file_all <- CO_parameters$file
+CO_parameters$file <- basename(CO_parameters$file)
+
+CO_all <- merge(CO_parameters, CO_validation[,c("file", "CO_VALID", "NOTES_NOTES_NOTES", "Validated.by")], all.x = TRUE, by = "file")
+
+colnames(CO_all) <- tolower(colnames(CO_all))
+colnames(CO_all)[colnames(CO_all) == "co_valid"] <- "visually_valid"
+colnames(CO_all)[colnames(CO_all) == "notes_notes_notes"] <- "visual_notes"
+
+# function to convert blanks to NA 
+
+blank2na <- function(x){ 
+  z <- gsub("\\s+", "", x)  #make sure it's "" and not " " etc
+  x[z==""] <- NA 
+  return(x)
+}
+
+CO_all$visual_notes <- blank2na(CO_all$visual_notes)
+CO_all$validated.by <- blank2na(CO_all$validated.by)
+
+
+
+### Calculate duration validity: 1 if >=44 hours, 2 if between 18 and 44 hours, 3 if < 18 hours -------
+CO_all$duration_valid <- ifelse(CO_all$hours >=44, 1, ifelse(CO_all$hours >=18, 2, 3))
+
+### Calculate overall validity
+ ## 1 If cf_conf hi, visual validity =1 , duration =1
+ ## 2 if cf_conf hi, visual validity =2, duration = 1 or 2
+ ## 2 if cf_conf = hi, visual validity = 1, duration = 2
+ ## 3 if cf_conf lo, visual validity =1 or 2, duration =1 or 2
+ ## 4 if visual validity= 3 or duration = 3 or cf_conf = none
+
+CO_all$overall_valid <- ifelse(CO_all$cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 1, 1, ifelse(CO_all$cf_conf == "hi" & CO_all$visually_valid ==2 & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 2, ifelse(CO_all$cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 2, 2, ifelse(CO_all$cf_conf == "lo" & (CO_all$visually_valid == 1 | CO_all$visually_valid == 2) & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 3, ifelse(CO_all$visually_valid == 3 | CO_all$duration_valid == 3 | CO_all$cf_conf == "none", 4, NA)))))
+
+# Check forms
+colSums(is.na(CO_all))
+unique(CO_all[!is.na(CO_all$visually_valid) & is.na(CO_all$validated.by), "lascar"])
+
+### Remove files that haven't been validated yet 
+CO_all <- CO_all[!is.na(CO_all$visually_valid),]
+nrow(CO_all) #6619
+
+### save
+saveRDS(CO_all, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds"))
+
+write.csv(CO_all, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%b%d"), ".csv"))

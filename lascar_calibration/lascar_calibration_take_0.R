@@ -9,11 +9,11 @@ require(lubridate)
 require(scales)
 
 ###### 
-# Original runs
+# Original runs -------
 ###############################################
 #enter file to examine (calibration run)
 ###############################################
-run <- "02Dec2014"   
+run <- "17Jan15 second cali"   
 ###############################################
 ###############################################
 
@@ -33,8 +33,8 @@ names(files)<-basename(files)
 calib <- ldply(files,lascar.import)
 
 
+
 #create lascar variable
-#lascar_pattern<-"CU_C._..." #note requires that lascar values be entered as three digits
 lascar_pattern <- "(CU_CO_...|CU_C0_...|CO_USB_...|COL_USB_...|CU-CO_...|CU-C0_...|CO-USB_...|COL-USB_...)" #note requires that lascar values be entered as three digits
 lascar_match<-regexpr(lascar_pattern, calib$.id)
 calib$lascar<-regmatches(calib$.id, lascar_match)
@@ -105,9 +105,12 @@ calib_cleaned$datetime[1]
 # Dec 01_1: "2014-12-01 08:33" / "2014-12-01-08:43"
 # Dec 01_2: "2014-12-01 09:03" / "2014-12-01-09:13"
 # Dec 02: "2014-12-02 10:20" / "2014-12-02 10:28"
+# Dec 22: this session with 4 lascars doesn't look normal (3 recorded no CO, the one that recorded is very spiky)
+# Jan 11: "2015-01-11 09:17" / "2015-01-11 09:25"
+# Jan 17: "2015-01-17 08:40"/ "2015-01-17 08:48"
 
-starttime <- "2014-12-02 10:20"
-stoptime <- "2014-12-02 10:28"
+starttime <- "2015-01-17 08:40"
+stoptime <- "2015-01-17 08:48"
 
 calib_factor<- calib_cleaned %.% filter(datetime > ymd_hm(starttime, tz = "GMT") & datetime < ymd_hm(stoptime, tz = "GMT"))
 
@@ -143,13 +146,13 @@ assign(paste0("calib_factor_", date),calib_factor)
 ########################
 
 
-#######################   START HERE IF ADDING TO A PREVIOUSLY ESTABLISHED FILE ###############
+#######################   START HERE IF ADDING TO A PREVIOUSLY ESTABLISHED FILE --------
 # If adding to a previously established file
 ########################
 
 calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration plots/calib_factor_allDec01.csv", stringsAsFactors = FALSE)
 
-calib_factor_all <- join_all(list(calib_factor_all, calib_factor_Dec02), by = "lascar", type = "full")
+calib_factor_all <- join_all(list(calib_factor_all, calib_factor_Jan11), by = "lascar", type = "full")
 
 calib_factor_all$lascar <- gsub("CU_C0", "CU_CO", calib_factor_all$lascar)
 
@@ -163,7 +166,7 @@ write.csv(calib_factor_all, file = paste0("calib_factor_all", format(Sys.Date(),
 
 
 ### split out the calibration factors
-calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allDec15.csv")
+calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allJan13.csv")
 factor_variables <- regmatches(names(calib_factor_all), regexpr("factor_.*", names(calib_factor_all)))
 
 calib_factors <- calib_factor_all[,colnames(calib_factor_all) %in% c("lascar", factor_variables)]
@@ -272,15 +275,16 @@ dev.off()
 
 
 #############
-### Calibration factors by interpolation
+### Calibration factors by interpolation ----------
 #############
 
 
 data <- calib_long
+# new Jan 25
 
-# change 0 to NA
-nrow(calib_long[calib_long$value == 0 &!is.na(calib_long$value),]) #21
-calib_long$value <- mapvalues(calib_long$value, from = 0, to = NA)
+# calculate mean
+mean(calib_long$value[!is.na(calib_long$value)]) # 0.76
+mean(calib_long$value[calib_long$value >= 0.6 & calib_long$value <= 1.2 & !is.na(calib_long$value)]) # 0.85
 
 
 # calculate monthly averages
@@ -294,81 +298,117 @@ for (i in 1:length(unique(calib_long$SN))) {
   d$cf <- NA
   if (colnames(d)[2] != "NA") d$cf <- rowMeans(d[,2:(ncol(d) - 1)], na.rm = TRUE)
   d$SN <- unique(data$SN)
-  d <- d[,c("monthyear", "SN", "cf")]
-  t <-as.data.frame(t(d[,c(1,3)]), stringsAsFactors = FALSE)
+  d$lascar <- data$lascar[1]
+  d <- d[,c("monthyear", "SN", "lascar", "cf")]
+  t <-as.data.frame(t(d[,c(1,4)]), stringsAsFactors = FALSE)
   colnames(t) <- t[1,]
   t <- t[-1,]
   t$SN <- unique(d$SN)
+  t$lascar <- d$lascar[1]
   row.names(t) <- NULL
   monthlycfs <- rbind(monthlycfs, t)
 }
 
-# set up a new data frame for the interpolated CFs
-cf <- data.frame(SN = monthlycfs$SN)
-cf[,2:22] <- NA
-colnames(cf)[2:5] <- paste0(c("September", "October", "November", "December"), "_2013")
+# set up a new data frame for the monthly averaged CFs
+cf <- data.frame(SN = monthlycfs$SN, lascar = monthlycfs$lascar)
+cf[,3:22] <- NA
+colnames(cf)[3:5] <- paste0(c("October", "November", "December"), "_2013")
 colnames(cf)[6:17] <- paste0(c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"), "_2014")
 colnames(cf)[18:22] <- paste0(c("January", "February", "March", "April", "May"), "_2015")
 
 
 cfs <- merge(cf, monthlycfs, all.y = TRUE)
-cfs <- cfs[,c(1, 8:12, 2:3, 13:14,4:5,15:17,6:7,18:22)]
-saveRDS(cfs, file = paste0("calib_factors_bymonth_", format(Sys.Date(), format = "%b%d"), ".rds"))
+cfs <- cfs[,c(1:2, 9:12, 3:4, 13:14, 5:6,15:17,7:8,18:22)]
+saveRDS(cfs, file = paste0("calib_factors_bymonth_", format(Sys.Date(), format = "%b%d"), ".rds")) # monthly averaged CFs (not interpolated)
 
 
-# interpolate
+#### INTERPOLATE -------
+cfs <- readRDS("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factors_bymonth_Jan26.rds")
+cf_new <- cfs
+cf_new[,23:42] <- NA
+conf_names <- paste0(names(cf_new[,3:22]), "_conf")
+for (i in 23:42) { colnames(cf_new)[i] <- conf_names[i-22] }
 
 # plot:
-pdf(file = paste0("Calib_factors_bymonth_", format(Sys.Date(), format = "%b%d"), ".pdf"), height = 10, width = 10)
+pdf(file = paste0("Calib_factors_bymonth_interp_", format(Sys.Date(), format = "%b%d"), ".pdf"), height = 10, width = 10)
 par(mfrow = c(3,3))
 for (i in 1:nrow(cfs)) {
-  xax <- 1:(ncol(cfs) - 1)
-  yax <- cfs[i, 2:ncol(cfs)]
-  plot(xax,yax, pch = 16, col = "red",ylim = c(0,2), main = cfs$SN[i], ylab = "Calibration Factor", xlab = "", xaxt = "n")
-  if(sum(!is.na(yax))>1) points(xax, approx(xax,yax, n = (ncol(cfs)-1), rule = 2, xout = 1:(ncol(cfs)-1))$y)
-  if(sum(!is.na(yax))==1) points(xax, rep.int(yax[!is.na(yax)], times =ncol(cfs)-1)) 
+  xax <- 1:(ncol(cfs) - 2)
+  yax <- cfs[i, 3:ncol(cfs)]
+ 
+  #### assigning initial values as the initial measured value
+  yax[1] <- cfs[i,which(!is.na(cfs[i,3:22]))[1]+2]
   
-  xlabels <-names(cfs)[2:ncol(cfs)]
+  
+  plot(xax,yax, pch = 16, col = "red",ylim = c(0,2), main = paste0(cfs$SN[i], " \n", cfs$lascar[i]), ylab = "Calibration Factor", xlab = "", xaxt = "n", cex.main = 0.95)
+  
+  #### interpolate
+  values <- which(!is.na(yax))
+  whichzero <- which(as.numeric(yax) < 0.2)[1] #  a "zero" CF is defined as < 0.2
+ interp <- approx(xax, yax, n = length(xax), xout = xax, rule = 2) # linear interpolation (rule = 2 sets constant interpolation outside the measured range)
+  interp2 <- approx(xax, yax, xout = xax, method = "constant", rule = 2) # constant interpolation
+ if (!is.na(whichzero) & whichzero !=1) interp_complete <- append(interp$y[1: max(values[values< whichzero])], interp2$y[(max(values[values < whichzero])+1):length(interp2$y)]) # linearly interpolate until last measured value before a "zero", then use constant interpolation
+ if (is.na(whichzero)) interp_complete <- interp$y # if no "zero", linearly interpolate across the whole range (constant interpolation after last measured point)
+ if (whichzero == 1 & !is.na(whichzero)) interp_complete <- interp2$y
+
+ # set colors according to CF confidence
+ allpoints <- as.data.frame(interp_complete)
+ allpoints$colors <- NA
+
+ # generally set colors within the "good" range as green and those outside as coral
+ allpoints$colors<- ifelse(allpoints$interp_complete > 1.2 | allpoints$interp_complete < 0.6, "coral", "lightgreen")
+ # apply coral color and lo confidence to values after a measured value and before a zero
+ if (!is.na(whichzero) & whichzero !=1) allpoints$colors[(max(values[values < whichzero])+1):whichzero] <- "coral"
+     
+ # apply coral color and lo confidence to entire set of data if there are no 2 adjacent valid measured CFs (including the virtual one as a measured value)
+ measured <- as.numeric(yax[!is.na(yax)])
+ v <- NULL
+ for (j in 1:length(measured) - 1) {
+   v <- append(v, measured[j] >= 0.6 & measured[j+1] >= 0.6 & measured[j] <=1.2 & measured[j+1] <=1.2)
+ }
+ if(sum(v) == 0) allpoints$colors <- "coral"
+ 
+# apply grey color and no confidence to any points with CF < 0.2
+ allpoints$colors <- ifelse(allpoints$interp_complete < 0.2, "grey", allpoints$colors)
+
+ points(xax, allpoints$interp_complete, pch = 16, col = allpoints$colors)
+ 
+ # map colors to confidence levels
+ allpoints$conf <- mapvalues(allpoints$colors, from = c("lightgreen", "coral", "grey"), to = c("hi", "lo", "none"), warn_missing = FALSE)
+ 
+
+ 
+  ### add back in the actual measured monthly averages in black
+  points(xax[2:length(xax)], yax[2:length(yax)], pch = 16, col = "black")
+
+  ### make the first (virtual) point red and add lines at 0.6 and 1.2
+  points(xax[1], yax[1], pch = 16, col = "red")
+  abline(h=0.6, lty = "dotted", col = "darkgrey")
+  abline(h = 1.2, lty = "dotted", col = "darkgrey")
+  
+
+
+ ### add x axis and legend
+  xlabels <-names(cfs)[3:ncol(cfs)]
   axis(side = 1, at = xax, labels = paste0(substr(xlabels, 1,3), substr(xlabels, nchar(xlabels)-4, nchar(xlabels))), las = 2, cex.axis = 0.9)
+
+  legend("top", c("virtual", "measured", "hi conf", "lo conf", "no conf"), xpd = TRUE, horiz = TRUE, inset = c(0,0), bty = "n", pch = 16, col = c("red", "black", "lightgreen", "coral", "grey"), cex = 0.8, x.intersp = 0.5)
+
+  ### add interpolated values to cf_new
+ cf_new[i, 3:22] <- round(allpoints$interp_complete, digits = 3)
+ cf_new[i, 23:42] <- allpoints$conf
 }
 dev.off()
 
 
-# save the interpolated CF factors
-cf_new <- cfs
-xax <- 1:(ncol(cf_new)-1)
-for (i in 1:nrow(cf_new)) {
-  yax <- cfs[i, 2:ncol(cfs)]
-  if(sum(!is.na(yax))>1) factors <- approx(xax, yax, n = (ncol(cf_new)-1), rule = 2, xout = 1:(ncol(cf_new)-1))$y
-  if(sum(!is.na(yax))==1) factors <- rep.int(yax[!is.na(yax)], times = ncol(cf_new)-1)
-  if(sum(!is.na(yax))==0) factors <- NA
-  cf_new[i,2:ncol(cf_new)] <- round(as.numeric(factors), digits = 3)
-}
-
+## save the interpolated CF factors 
 saveRDS(cf_new, file = paste0("calib_factors_bymonth_interp_", format(Sys.Date(), format = "%b%d"), ".rds"))
 
-# plot to check (should be same as above plot but all dots red)
-pdf(file = paste0("Calib_factors_interp_check", format(Sys.Date(), format = "%b%d"), ".pdf"), height = 10, width = 10)
-par(mfrow = c(3,3))
-for (i in 1:nrow(cf_new)) {
-  xax <- 1:(ncol(cf_new) - 2)
-  yax <- cf_new[i, 3:ncol(cf_new)]
-  plot(xax,yax, pch = 16, col = "red",ylim = c(0,2), main = paste(cf_new$lascar[i], "(", cf_new$SN[i], ")"), ylab = "Calibration Factor", xlab = "", xaxt = "n")
-  #   if(sum(!is.na(yax))>1) points(xax, approx(xax,yax, n = (ncol(cf)-2), rule = 2, xout = 1:(ncol(cf)-2))$y)
-  #   if(sum(!is.na(yax))==1) points(xax, rep.int(cf[i, !is.na(cf[i,])][2], times =ncol(cf)-2)) 
-  xlabels <-names(cf_new)[3:ncol(cf_new)]
-  axis(side = 1, at = xax, labels = paste0(substr(xlabels, 1,3), substr(xlabels, nchar(xlabels)-4, nchar(xlabels))), las = 2, cex.axis = 0.9)
-}
-dev.off()
 
 
 
 
-#### Calculate the mean CF to use in units with no valid CF -------
-head(calib_long)
-nrow(calib_long) #1963
-nrow(calib_long[!is.na(calib_long$value),]) #319
-length(calib_long$value[calib_long$value > 0.3 & calib_long$value < 1.5 & !is.na(calib_long$value)]) #305
-mean(calib_long$value[calib_long$value > 0.3 & calib_long$value < 1.5 & !is.na(calib_long$value)]) # 0.8323
+
+
 
 
