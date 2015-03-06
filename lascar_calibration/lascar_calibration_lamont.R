@@ -1,3 +1,4 @@
+# Process Calibration data conducted at Lamont
 
 path <- "/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Lamont CO Calibrations 21Jan2015/"
 files<-list.files(path,full.names=T)
