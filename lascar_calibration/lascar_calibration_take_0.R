@@ -13,13 +13,13 @@ require(scales)
 ###############################################
 #enter file to examine (calibration run)
 ###############################################
-run <- "17Jan15 second cali"   
+run <- "09Feb2015_2"   
 ###############################################
 ###############################################
 
-path<-paste("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/", run, sep="")
+path<-paste("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/", run, sep="")
 path
-files<-list.files(path,full.names=T)
+files<-list.files(path,full.names=T, recursive = FALSE, include.dirs = FALSE)
 length(files)
 
 lascar.import <- function(x){
@@ -42,10 +42,10 @@ calib$lascar<-regmatches(calib$.id, lascar_match)
 
 # calib<-calib%.%filter(co<80) # why?
 
-ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line()
+ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line() + ggtitle(run)
 
 pdf(file = paste0("Calib_plot_", run, ".pdf"))
-ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line()
+ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line() + ggtitle(run)
 dev.off()
 
 #check times - some of the lasars appear to be set to the wrong time.
@@ -108,9 +108,11 @@ calib_cleaned$datetime[1]
 # Dec 22: this session with 4 lascars doesn't look normal (3 recorded no CO, the one that recorded is very spiky)
 # Jan 11: "2015-01-11 09:17" / "2015-01-11 09:25"
 # Jan 17: "2015-01-17 08:40"/ "2015-01-17 08:48"
+# Feb 09_1: "2015-02-09 09:47"/ "2015-02-09 09:51"
+# Feb 09_2: "2015-02-09 11:19"/ "2015-02-09 11:23"
 
-starttime <- "2015-01-17 08:40"
-stoptime <- "2015-01-17 08:48"
+starttime <- "2015-02-09 11:19"
+stoptime <- "2015-02-09 11:23"
 
 calib_factor<- calib_cleaned %.% filter(datetime > ymd_hm(starttime, tz = "GMT") & datetime < ymd_hm(stoptime, tz = "GMT"))
 
@@ -126,8 +128,8 @@ calib_factor <- calib_factor %.% group_by(lascar) %.% dplyr::summarise(co = mean
 
 ### name columns and create a date-stamped data frame ----
 
-date <-  format(dmy(run, tz = "GMT"), format = "%b%d") # for any dates with only one run
-# date <- "Mar03_2" # For March 03 and Dec 01 when there were 2 runs
+# date <-  format(dmy(run, tz = "GMT"), format = "%b%d") # for any dates with only one run
+date <- "Feb09_2" # For eg  March 03 and Dec 01 when there were 2 runs
 
 names(calib_factor) <- c("lascar", paste0("co_", date), paste0("factor_", date))
 calib_factor$lascar <- gsub("CU_C0", "CU_CO", calib_factor$lascar)
