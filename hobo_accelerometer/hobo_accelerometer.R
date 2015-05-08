@@ -46,7 +46,7 @@ hobo_stacked <- ldply(files, hobo_import, .progress = "text")   # note: no compl
 
 # test threshold
 stacked_files <- unique(hobo_stacked$file)
-width <- 3
+width <- 6
 # calculate compliance
 for (i in 1:length(stacked_files)) {
   plotdata <- hobo_stacked[hobo_stacked$file == stacked_files[i],]
