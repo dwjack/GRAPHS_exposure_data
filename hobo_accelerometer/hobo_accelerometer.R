@@ -44,45 +44,31 @@ hobo_import <- function(file) {
 hobo_stacked <- ldply(files, hobo_import, .progress = "text")   # note: no compliance info
   
 
-# test threshold
 stacked_files <- unique(hobo_stacked$file)
-width <- 6
+
+
 # calculate compliance
+
+width <- 5 # setting a 15-minute (3*5) window for calculating the rolling average
+
+pdf(file = paste0("HOBO_accel_data_",format(Sys.Date(), format = "%b%d"), ".pdf"), width = 10, height = 10)
+par(mfrow = c(2,2))
 for (i in 1:length(stacked_files)) {
   plotdata <- hobo_stacked[hobo_stacked$file == stacked_files[i],]
-  pdf(file = paste0("SQ_Compliance Threshold Test_window",width*3, stacked_files[i],".pdf"), width = 10, height = 10)
-  par(mfrow = c(2,2))
-  # for (j in c(0.02, 0.025, 0.03, 0.04, 0.05)) {
-  for (j in c(0.0005, 0.001, 0.0015, 0.002, 0.003)) {
-    compliance_threshold <- j
-# plotdata$sd_above_threshold = ifelse(plotdata$sd_vectorsum_g > compliance_threshold, 1, 0)
-plotdata$sd_above_threshold <- ifelse(plotdata$sd_vectorsum_squared > compliance_threshold, 1, 0)
-
-plotdata$sd_rollmean <- as.numeric(rollapply(plotdata$sd_above_threshold, width=width,  FUN = mean, align = "center", na.rm = TRUE, fill = NA)) # width of 3 is equal to a 9-minute window 
-plotdata$compliance_rollmean <- ifelse(plotdata$sd_rollmean > 0, 1, 0)
-plotdata$percent_compliant <- mean(plotdata$compliance_rollmean, na.rm = TRUE) # % of time
-
- 
-
-
-#  compliant: 
-# with 0.03, for 30s, 24.69. For 10s, 22.39
-# with 0.04, for 30s, 19.51, for 10s, 19.90
+  compliance_threshold <- ifelse(plotdata$log_interval_s[1] == 30, 0.002, 0.001) # set compliance threshold to 0.002 for 30-second logging and 0.001 for 10-second logging
+  plotdata$sd_above_threshold <- ifelse(plotdata$sd_vectorsum_squared > compliance_threshold, 1, 0)
+  plotdata$sd_rollmean <- as.numeric(rollapply(plotdata$sd_above_threshold, width=width,  FUN = mean, align = "center", na.rm = TRUE, fill = NA)) 
+  plotdata$compliance_rollmean <- ifelse(plotdata$sd_rollmean > 0, 1, 0)
+  plotdata$percent_compliant <- mean(plotdata$compliance_rollmean, na.rm = TRUE) # % of time
+  
+  
   plot(plotdata$three_minutes, plotdata$mean_vectorsum_g, type = "l", ylim = c(0, max(plotdata$mean_vectorsum_g)), main = paste("Compliance Threshold =", compliance_threshold, "Window =", width*3, "minutes \n Logger interval =", plotdata$log_interval_s[1], "s, Percent compliant = ", round(plotdata$percent_compliant[1]*100, digits = 1)), cex.main = 0.8, ylab = "mean vector sum (g force)", xlab = "time (3-minute average)", xaxt = "n")
   lines(plotdata$three_minutes, plotdata$compliance_rollmean/1.5, col = "aquamarine3")
   text(x  = mean(plotdata$three_minutes), y = 0.69, labels = "<--compliant-->", cex = 0.8)
   axis.POSIXct(1, at=seq(from = floor_date(plotdata$three_minutes[1], unit = "hour"), to = ceiling_date(plotdata$three_minutes[nrow(plotdata)], unit = "hour"), by = "hour", labels=format(plotdata$three_minutes, "%h")), las = 2)
-
-
 }
 dev.off()
-}
 
-#   }
-#   dev.off()
- # 0.03 looks good as threshold for 30s, and pretty good for 10s too (or 0.04?)
- 
- 
 
 
 
