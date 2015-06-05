@@ -4,7 +4,8 @@ require(plyr)
 require(dplyr)
 require(zoo)
 
-files <- list.files("/Users/ashlinn/Dropbox/Ghana project/ECM Pilot/HOBO accelerometer data/May 6/", recursive=F, full.names=T) 
+# ECM pilot HOBO files: /Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/ECM_Pilot/Feasibility Pilot/HOBO Accelerometer data/
+files <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/ECM_Pilot/Feasibility Pilot/HOBO Accelerometer data/", pattern = ".csv", recursive=F, full.names=T) 
 length(files) 
 
 hobo_import <- function(file) {
@@ -19,7 +20,7 @@ hobo_import <- function(file) {
   }
   data$SN <- SN
   data$log_interval_s <- as.numeric(difftime(data$date_time[10], data$date_time[9], units = "secs"))
-  data$date_time <- mdy_hms(data$date_time, tz = "GMT")
+  data$date_time <- dmy_hms(data$date_time, tz = "GMT")
   data$minute <- floor_date(data$date_time, "minute")
   data$centered_vectorsum_squared <- (data$vectorsum_g - mean(data$vectorsum, na.rm = TRUE))^2
   # divide by 3 minutes: this section is slow, don't know how to avoid the for loop
@@ -62,7 +63,7 @@ for (i in 1:length(stacked_files)) {
   plotdata$percent_compliant <- mean(plotdata$compliance_rollmean, na.rm = TRUE) # % of time
   
   
-  plot(plotdata$three_minutes, plotdata$mean_vectorsum_g, type = "l", ylim = c(0, max(plotdata$mean_vectorsum_g)), main = paste("Compliance Threshold =", compliance_threshold, "Window =", width*3, "minutes \n Logger interval =", plotdata$log_interval_s[1], "s, Percent compliant = ", round(plotdata$percent_compliant[1]*100, digits = 1)), cex.main = 0.8, ylab = "mean vector sum (g force)", xlab = "time (3-minute average)", xaxt = "n")
+  plot(plotdata$three_minutes, plotdata$mean_vectorsum_g, type = "l", ylim = c(0, max(plotdata$mean_vectorsum_g)), main = paste("Compliance Threshold =", compliance_threshold, "Window =", width*3, "minutes \n Logger interval =", plotdata$log_interval_s[1], "s, Percent compliant = ", round(plotdata$percent_compliant[1]*100, digits = 1)), cex.main = 0.8, ylab = "mean vector sum (g force)", xlab = "", xaxt = "n")
   lines(plotdata$three_minutes, plotdata$compliance_rollmean/1.5, col = "aquamarine3")
   text(x  = mean(plotdata$three_minutes), y = 0.69, labels = "<--compliant-->", cex = 0.8)
   axis.POSIXct(1, at=seq(from = floor_date(plotdata$three_minutes[1], unit = "hour"), to = ceiling_date(plotdata$three_minutes[nrow(plotdata)], unit = "hour"), by = "hour", labels=format(plotdata$three_minutes, "%h")), las = 2)
