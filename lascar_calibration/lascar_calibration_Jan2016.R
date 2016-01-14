@@ -1,7 +1,7 @@
 # Process calibration data from KHRC
 #stack the calibration data and plot it
 #created 24 Feb 2014
-# modified 28 Nov 2014
+# modified 13 Jan 2016
 require(plyr)
 require(dplyr)
 require(ggplot2)
@@ -18,10 +18,10 @@ lascar.import <- function(x){
   dt
 }
 
-## Previously calculated: through Jan 11, 2015
-calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allJan13.csv", stringsAsFactors = FALSE)
+## Previously calculated: through June, 2015
+calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factor_allOct06.csv")
 
-# actually at least plotted them thru Feb 9, 2015...but not validated based on this
+# Monthly factors interpolated: through Jan 2015
 
 previous <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # merged by SN, not interpolated
 
@@ -33,15 +33,19 @@ previous <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_ca
 # 02Feb2015_1 through _4
 # 09Feb2015_1 through _2
 # 27Jun2015_1 through _2
-# 30Jun2015
+# 30Jun2015 # did I do through here? Yes. in calib_factor_allOct06 - the calib factors
+
 # 17Nov2015
+# 20Nov2015
+# 21Nov2015
+
 
 ###### 
 # Original runs -------
 ###############################################
 #enter file to examine (calibration run)
 ###############################################
-run <- "17Nov2015"   
+run <- "21Nov2015"   
 ###############################################
 ###############################################
 
@@ -76,7 +80,8 @@ ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line() + ggtitle(run)
 dev.off()
 
 #check times - some of the lasars appear to be set to the wrong time.
-meantime<-calib %.% group_by(lascar) %.% dplyr::summarise(datetime=mean(datetime),mean(co)) %.% arrange(desc(datetime))
+meantime<-calib %>% group_by(lascar) %>% dplyr::summarise(datetime=mean(datetime),mean(co)) %>% arrange(desc(datetime))
+meantime <- as.data.frame(meantime)
 meantime[,2] <- as.POSIXct(meantime[,2], origin="1970-01-01", tz='UTC')
 
 meantime #table for inspection
@@ -166,12 +171,14 @@ calib_cleaned$datetime[1]
 # Jun27_2: "2015-06-27 14:45" / "2015-06-27 14:51"
 # Jun30: "2015-06-30 11:15" / "2015-06-30 11:18"
 # Nov 17: "2015-11-17 10:32" / "2015-11-17 10:37"
+# Nov 20: "2015-11-20 09:02" / "2015-11-20 09:08"
+# Nov 21: "2015-11-21 07:38" / "2015-11-21 07:42"
 
 
-starttime <-"2015-11-17 10:32"
-stoptime <- "2015-11-17 10:37"
+starttime <- "2015-11-21 07:38" 
+stoptime <- "2015-11-21 07:42"
 
-calib_factor<- calib_cleaned %.% filter(datetime > ymd_hm(starttime, tz = "GMT") & datetime < ymd_hm(stoptime, tz = "GMT"))
+calib_factor<- calib_cleaned %>% filter(datetime > ymd_hm(starttime, tz = "GMT") & datetime < ymd_hm(stoptime, tz = "GMT"))
 
 ggplot(calib_factor,aes(x=datetime,y=co,colour=lascar))+geom_line()+scale_x_datetime(breaks = date_breaks("min"), labels = date_format("%H:%M"))
 
@@ -180,7 +187,7 @@ ggplot(calib_factor,aes(x=datetime,y=co,colour=lascar))+geom_line()+scale_x_date
 dev.off()
 
 # calculate the calibration factor
-calib_factor <- calib_factor %.% group_by(lascar) %.% dplyr::summarise(co = mean(co), factor = round(co/50, digits = 3))
+calib_factor <- calib_factor %>% group_by(lascar) %>% dplyr::summarise(co = mean(co), factor = round(co/50, digits = 3))
 
 
 ###################################################
@@ -198,7 +205,18 @@ date <-  format(dmy(run, tz = "GMT"), format = "%Y%b%d") # for any dates with on
 names(calib_factor) <- c("lascar", paste0("co_", date), paste0("factor_", date))
 calib_factor$lascar <- gsub("CU_C0", "CU_CO", calib_factor$lascar)
 
+####################
+# Assign any grossly problematic units to 0
+####################
+# Nov 20: CU_CO_240
+# calib_factor[calib_factor$lascar == "CU_CO_240",2:3] <- 0
+
 assign(paste0("calib_factor_", date),calib_factor)
+
+
+
+
+
 
 
 #####################################
@@ -216,9 +234,10 @@ assign(paste0("calib_factor_", date),calib_factor)
 # If adding to a previously established file
 ########################
 
-calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allJan13.csv", stringsAsFactors = FALSE)
 
-calib_factor_all <- join_all(list(calib_factor_all, calib_factor_2015Jan17, calib_factor_2015Jan28_1, calib_factor_2015Jan28_2, calib_factor_2015Jan30_1, calib_factor_2015Jan30_2, calib_factor_2015Jan31, calib_factor_2015Feb02_1, calib_factor_2015Feb02_2, calib_factor_2015Feb02_3, calib_factor_2015Feb02_4, calib_factor_2015Feb09_1, calib_factor_2015Feb09_2, calib_factor_2015Jun27_1, calib_factor_2015Jun27_2, calib_factor_2015Jun30), by = "lascar", type = "full")
+calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factor_allOct06.csv", stringsAsFactors = FALSE)
+
+calib_factor_all <- join_all(list(calib_factor_all, calib_factor_2015Nov17, calib_factor_2015Nov20, calib_factor_2015Nov21), by = "lascar", type = "full")
 
 
 
@@ -230,10 +249,10 @@ calib_factor_all <- calib_factor_all[order(calib_factor_all$lascar),]
 
 write.csv(calib_factor_all, file = paste0("calib_factor_all", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
 
-# stopped here Oct 6
+
 
 ### split out the calibration factors
-calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factor_allOct06.csv")
+calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana project/Ghana R stuff/calib_factor_allJan13.csv")
 factor_variables <- regmatches(names(calib_factor_all), regexpr("factor_.*", names(calib_factor_all)))
 
 calib_factors <- calib_factor_all[,colnames(calib_factor_all) %in% c("lascar", factor_variables)]
@@ -258,8 +277,12 @@ for (i in 1:nrow(calib_factors)) {
 
 calib_factors_ordered <- calib_factors[order(calib_factors$lascar),]
 
+# stopped here Jan 13
 
+###################################
 ## Add SNs to calib_factors_ordered
+###################################
+
 #### DO this if need to generate new SNs, otherwise skip
 # Need to start with a  CO_stacked files file.
 
