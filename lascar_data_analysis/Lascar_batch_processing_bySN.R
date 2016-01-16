@@ -11,14 +11,29 @@ require(dplyr)
 require(ggplot2)
 require(scales)
 require(reshape2)
+
+#########
+# note some dropboxes referred to as ~/Dropbox/Ghana_exposure_data_SHARED_2014 and some as ~/Dropbox/Ghana_exposure_data_SHARED_2014, do find/replace
+##########
+
+
 #####################
 # To load data from original Lascar .csv files
 #####################
 
 
 #create vectors of all file names  -----
-files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=T) 
-length(files) #6656 / 6937 / Jan 29 7472
+files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=T) 
+length(files) #6656 / 6937 / Jan 29 7472 / Jan 15, 2016 11652
+
+# Exclude files that have been processed previously
+CO_parameters <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_parameters_7152sessions_Feb03.rds")
+summary(CO_parameters) # no NAs for validity
+nrow(CO_parameters) # 6619 previously validated files from Feb 2015
+
+files <- files[!basename(files) %in% CO_parameters$file]
+length(files) # 5033
+sum(duplicated(basename(files))) # 12 are duplicated
 
 # make a data frame of the files
 Lascar_data <- data.frame(file = files, stringsAsFactors = FALSE)
@@ -41,7 +56,7 @@ Lascar_data$lascar <- ifelse(substr(Lascar_data$lascar, start = nchar(Lascar_dat
 
 
 
-length(unique(Lascar_data$lascar)) # 207
+length(unique(Lascar_data$lascar)) 
 
 # load data to get SNs ----
 
@@ -67,11 +82,18 @@ file_data$lascar_infile <- gsub("\\.", "_", file_data$lascar_infile)
 Lascar_data <- merge(Lascar_data, file_data, by = "file2")
 
 Lascar_data <- Lascar_data[!duplicated(Lascar_data$firstline),] # remove duplicates
-nrow(Lascar_data) #6623/ Jan 29 7152
+nrow(Lascar_data) #6623/ Jan 29 7152/ Jan 15, 2016 5041
 
-match the CF (pulls the CF from the month of the last day of monitoring) - see "lascar_calibration_take_0.R"
+saveRDS(Lascar_data, file = paste0("Lascar_SN_data_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
 
-cf_new <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_interp_Jan29.rds")
+# match the CF (pulls the CF from the month of the last day of monitoring) - see "lascar_calibration_Jan2016.R"
+Lascar_data <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Lascar_SN_data_2016Jan16.rds")
+cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Jan16.rds")
+
+Lascar_data$monthyear <- paste0(substr(Lascar_data$monthyear, nchar(Lascar_data$monthyear)-3, nchar(Lascar_data$monthyear)), substr(Lascar_data$monthyear, 1, nchar(Lascar_data$monthyear) - 5))
+
+Lascar_data$cf <- NA
+Lascar_data$cf_conf <- NA
 for (i in 1:nrow(Lascar_data)){
   cfmatch <- match(Lascar_data$SN[i], cf_new$SN) 
   Lascar_data$cf[i] <- cf_new[cfmatch, names(cf_new) == Lascar_data$monthyear[i]]
@@ -83,22 +105,25 @@ Lascar_data$cf <- as.numeric(Lascar_data$cf)
 dropbox_pattern <- "dropbox.attributes"
 Lascar_data <- Lascar_data[regexpr(dropbox_pattern, Lascar_data$file) == -1,]
 
+summary(Lascar_data) # 101 NAs for cf
+length(unique(Lascar_data$SN[is.na(Lascar_data$cf)])) # 19 unique Lascars have no calib info
+
 # save Lascar_data
-saveRDS(Lascar_data, file = paste0("Lascar_data_cf_", format(Sys.Date(), format = "%b%d"), ".rds" ))
+saveRDS(Lascar_data, file = paste0("Lascar_data_cf_", format(Sys.Date(), format = "%Y%b%d"), ".rds" ))
 
-# just the new ones
-cf_new <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_interp_Jan29.rds")
-for (i in 1:nrow(file_data)){
-  cfmatch <- match(file_data$SN[i], cf_new$SN) 
-  file_data$cf[i] <- cf_new[cfmatch, names(cf_new) == file_data$monthyear[i]]
-  file_data$cf_conf[i] <- cf_new[cfmatch, names(cf_new) == paste0(file_data$monthyear[i], "_conf")]
-}
-file_data$cf <- as.numeric(file_data$cf)
-
-
-
-Lascar_data <- file_data
-files_bySN <- Lascar_data[, c("file", "cf", "cf_conf")]
+# # just the new ones
+# cf_new <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_interp_Jan29.rds")
+# for (i in 1:nrow(file_data)){
+#   cfmatch <- match(file_data$SN[i], cf_new$SN) 
+#   file_data$cf[i] <- cf_new[cfmatch, names(cf_new) == file_data$monthyear[i]]
+#   file_data$cf_conf[i] <- cf_new[cfmatch, names(cf_new) == paste0(file_data$monthyear[i], "_conf")]
+# }
+# file_data$cf <- as.numeric(file_data$cf)
+# 
+# 
+# 
+# Lascar_data <- file_data
+# files_bySN <- Lascar_data[, c("file", "cf", "cf_conf")]
 
 
 
@@ -113,7 +138,7 @@ lascar.import <- function(file,cf, cf_conf) {
   dt$SN<- dt$Serial.Number[1]
   dt$datetime <- dmy_hms(dt$Time, tz="GMT")
   dt$rd.datetime <- as.character(round(dt$datetime, 'min'))
-  dt<-dt %.% group_by(rd.datetime) %.% dplyr::summarise(mean(CO.ppm.), lascar[1], SN[1])
+  dt<-dt %>% group_by(rd.datetime) %>% dplyr::summarise(mean(CO.ppm.), lascar[1], SN[1])
   names(dt) <- c('datetime','co', 'lascar', 'SN')
   dt$datetime <- ymd_hms(dt$datetime)
   dt$cf <- cf
@@ -129,11 +154,11 @@ lascar.import <- function(file,cf, cf_conf) {
 # If working from raw files be sure to comment out section at "START HERE IF WORKING FROM SAVED .RDS DATA
 ## NOTE: THE FOLLOWING STEPS FROM THE RAW DATA TAKE A LONG TIME!
 
-Lascar_data <- readRDS("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/Lascar_data_cf_Jan29.rds")
+Lascar_data <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/Lascar_data_cf_2016Jan16.rds")
 
 ##################################
 # set a directory for the saved data
-directory <- "/Users/ashlinn/Dropbox/Ghana project/BP project/ABP Project/"
+directory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Jan16/CO_stacked files/"
 ##################################
 
 
@@ -189,7 +214,7 @@ for (i in 1:length(unique(Lascar_data$SN))) { #1:length(unique(Lascar_data$SN)))
     #########################
     # set a directory for the saved plots & a meanCF to use for plots that have no CF
     #########################
-    plotdirectory <- "~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/Plots by SN/"
+    plotdirectory <- "~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Jan16/Plots by SN/"
     meancf <- 0.85 #(mean across all units' CFs that were between 0.6 and 1.2 between Feb and Dec 2014)
     
     
@@ -248,7 +273,7 @@ proc.time()-ptm
 
 ########################################### END plot saving ############
 
-
+## STOPPED HERE JAN 16 -------
 
 allplots <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/Plots by SN/", full.names = TRUE)
 length(allplots) # 174
@@ -258,13 +283,13 @@ length(allplots) # 174
 ####################################################################
 # This is generating an equivalent list of NAs?
 
-COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/CO_stacked files/",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
+COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/29Jan2015/CO_stacked files/",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
 length(COfiles) #174
 
 # # original
 # CO.parameters <- function(x) { 
 #   CO_stacked_bySN <- readRDS(x)
-#   data <- CO_stacked_bySN %.% group_by(file) %.% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], cf_conf = cf_conf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE))
+#   data <- CO_stacked_bySN %>% group_by(file) %>% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], cf_conf = cf_conf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE))
 #   data$hours <- as.numeric(round(difftime(data$lastdate, data$firstdate, units = "hours"), digits = 1))
 #   data
 # }
@@ -272,7 +297,7 @@ length(COfiles) #174
 # new adding first 24h and first 48h
 CO.parameters <- function(x) { 
   CO_stacked_bySN <- readRDS(x)
-  data <- CO_stacked_bySN %.% group_by(file) %.% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], cf_conf = cf_conf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE), mean_first24_corr = mean(co_corr[datetime < datetime[1] + hours(24)]), mean_first48_corr = mean(co_corr[datetime < datetime[1] + hours(48)]))
+  data <- CO_stacked_bySN %>% group_by(file) %>% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], cf_conf = cf_conf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE), mean_first24_corr = mean(co_corr[datetime < datetime[1] + hours(24)]), mean_first48_corr = mean(co_corr[datetime < datetime[1] + hours(48)]))
   data$hours <- as.numeric(round(difftime(data$lastdate, data$firstdate, units = "hours"), digits = 1))
   data
 }
@@ -298,7 +323,7 @@ saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "ses
 savedfiles <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/20Dec2014/CO_stacked files/", full.names = TRUE)
 length(savedfiles)
 
-directory <- "~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/Validation Forms/"
+directory <- "~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/Validation Forms/"
 
 meancf <- 0.83
 for (i in 1:length(savedfiles)){ #

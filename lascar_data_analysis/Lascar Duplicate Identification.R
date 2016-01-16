@@ -60,7 +60,7 @@ Naming_problems$problem_session <- as.character(Naming_problems$problem_session)
 Naming_problems <- Naming_problems[order(Naming_problems$mstudyid),]
 
 # save as .csv
-write.csv(Naming_problems, file = paste0("Naming_problems_", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
+write.csv(Naming_problems, file = paste0("Naming_problems_", format(Sys.Date(), format = "%Y%b%d"), ".csv"), row.names = FALSE)
 
 ############################
 

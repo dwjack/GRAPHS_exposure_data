@@ -1,7 +1,13 @@
 # Process calibration data from KHRC
 #stack the calibration data and plot it
 #created 24 Feb 2014
-# modified 13 Jan 2016
+# modified 16 Jan 2016
+
+# Interpolation of CFs follows the documentation in "GRAPHS Lascar CO Data Validation Plan_V2"
+
+# note that on some computers the pathname is ~/Dropbox/Ghana_exposure_data_SHARED_2014 while on others it is ~/Dropbox/Ghana_exposure_data_SHARED_2014
+# do a replace-all
+
 require(plyr)
 require(dplyr)
 require(ggplot2)
@@ -19,11 +25,13 @@ lascar.import <- function(x){
 }
 
 ## Previously calculated: through June, 2015
-calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factor_allOct06.csv")
+calib_factor_all_old <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factor_allOct06.csv")
+calib_factor_all <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factor_allJan13.csv")
 
 # Monthly factors interpolated: through Jan 2015
+# /Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files
 
-previous <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # merged by SN, not interpolated
+previous <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # merged by SN, not interpolated
 
 # New dates to do: 
 # 17Jan15 second cali
@@ -251,105 +259,228 @@ write.csv(calib_factor_all, file = paste0("calib_factor_all", format(Sys.Date(),
 
 
 
-### split out the calibration factors
-calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana project/Ghana R stuff/calib_factor_allJan13.csv")
-factor_variables <- regmatches(names(calib_factor_all), regexpr("factor_.*", names(calib_factor_all)))
-
-calib_factors <- calib_factor_all[,colnames(calib_factor_all) %in% c("lascar", factor_variables)]
-calib_factors$mean <- NA
-calib_factors$sd <- NA
-calib_factors$calibrations <- NA
-calib_factors$mean_excl_0 <- NA
-
-calib_factors$mean <- rowMeans(calib_factors[,2:(ncol(calib_factors)-4)], na.rm = TRUE)
-calib_factors$calibrations <- rowSums(!is.na(calib_factors[,2:(ncol(calib_factors)-4)]))
-
-for (i in 1:nrow(calib_factors)) {
-calib_factors$sd[i] <- sd(calib_factors[i,2:(ncol(calib_factors)-4)], na.rm = TRUE)
-}
-
-for (i in 1:nrow(calib_factors)) {
-  tempdata <- as.numeric(calib_factors[i, 2:(ncol(calib_factors) - 4)])
-  tempdata <- tempdata[!tempdata == 0]
-  calib_factors$mean_excl_0[i] <- mean(tempdata, na.rm = TRUE)
-  }
-
-
-calib_factors_ordered <- calib_factors[order(calib_factors$lascar),]
-
-# stopped here Jan 13
+# ### split out the calibration factors
+# calib_factor_all <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factor_allJan13.csv")
+# factor_variables <- regmatches(names(calib_factor_all), regexpr("factor_.*", names(calib_factor_all)))
+# 
+# calib_factors <- calib_factor_all[,colnames(calib_factor_all) %in% c("lascar", factor_variables)]
+# calib_factors$mean <- NA
+# calib_factors$sd <- NA
+# calib_factors$calibrations <- NA
+# calib_factors$mean_excl_0 <- NA
+# 
+# calib_factors$mean <- rowMeans(calib_factors[,2:(ncol(calib_factors)-4)], na.rm = TRUE)
+# calib_factors$calibrations <- rowSums(!is.na(calib_factors[,2:(ncol(calib_factors)-4)]))
+# 
+# for (i in 1:nrow(calib_factors)) {
+# calib_factors$sd[i] <- sd(calib_factors[i,2:(ncol(calib_factors)-4)], na.rm = TRUE)
+# }
+# 
+# for (i in 1:nrow(calib_factors)) {
+#   tempdata <- as.numeric(calib_factors[i, 2:(ncol(calib_factors) - 4)])
+#   tempdata <- tempdata[!tempdata == 0]
+#   calib_factors$mean_excl_0[i] <- mean(tempdata, na.rm = TRUE)
+#   }
+# 
+# 
+# calib_factors_ordered <- calib_factors[order(calib_factors$lascar),]
+# 
+# # stopped here Jan 13
 
 ###################################
 ## Add SNs to calib_factors_ordered
 ###################################
 
+
 #### DO this if need to generate new SNs, otherwise skip
-# Need to start with a  CO_stacked files file.
+# start with Lascar_SN_data from Lascar_batch_processing_bySN.R
 
-files <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/12Dec2014/CO_stacked files/")
-length(files)
+Lascar_SN_to_ID <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Lascar_SN_to_ID.csv", stringsAsFactors = FALSE)
+Lascar_SNs <- readRDS("/Users/Adoption/Documents/GRAPHS exposure R scripts/Lascar_SN_data_2016Jan15.rds")
+Lascar_SNs$unique_ID <- paste(Lascar_SNs$lascar, Lascar_SNs$SN, sep = "_")
 
-SN_data <- as.data.frame(files)
-SN_data$SN <- regmatches(SN_data[,1], regexpr("_\\d+\\.", SN_data[,1]))
-SN_data$SN <- substr(SN_data$SN, 2, nchar(SN_data$SN)-1)
 
-lascar_pattern <- "(CO.USB....|COL.USB....|CU.CO....)"
-SN_data$lascar <- regmatches(SN_data$files, regexpr(lascar_pattern, SN_data$files))
-SN_data$lascar <- ifelse(substr(SN_data$lascar, start = nchar(SN_data$lascar), stop = nchar(SN_data$lascar)) == "_", substr(SN_data$lascar, 1, nchar(SN_data$lascar)-1),SN_data$lascar)
-
-#208 files, 171 unique SNs, 206 unique lascars....
-test_table <- data.frame(SN = unique(SN_data$SN))
-for (i in 1:nrow(test_table)) {
-  test_table$no_lascars[i] <- length(SN_data$lascar[SN_data$SN == test_table$SN[i]])
-}
-test_table$lascar1 <- NA
-test_table$lascar2 <- NA
-test_table$lascar3 <- NA
-for (i in 1:nrow(test_table)) {
-  test_table$lascar1[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][1]
-  test_table$lascar2[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][2]
-  test_table$lascar3[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][3]
+# make chart of SNs
+sns <- data.frame(unique_ID = unique(Lascar_SNs$unique_ID))
+for (i in 1:nrow(sns)) {
+  sns$lascar[i] <- unique(Lascar_SNs$lascar[Lascar_SNs$unique_ID == sns$unique_ID[i]])
+  sns$SN[i] <- unique(Lascar_SNs$SN[Lascar_SNs$unique_ID == sns$unique_ID[i]])
 }
 
-Lascar_SN_to_ID <- test_table
-write.csv(Lascar_SN_to_ID, file = "Lascar_SN_to_ID.csv", row.names = FALSE)
+# make long format
+oldSNs <- melt(Lascar_SN_to_ID, id.vars = "SN", measure.vars = c("lascar1", "lascar2", "lascar3"))
+oldSNs <- oldSNs[, c(1,3)]
+names(oldSNs)[2] <- "lascar"
+oldSNs <- oldSNs[,c(2,1)]
+newSNs <- rbind(oldSNs, sns[, c("lascar", "SN")])
+newSNs <- newSNs[!duplicated(newSNs),]
 
-######### skip to here
+# make Lascar IDs consistent
+length(unique(newSNs$lascar))
+newSNs$lascar <- gsub("C0", "CO", newSNs$lascar)
+newSNs$lascar <- gsub("-", "_", newSNs$lascar)
+newSNs$lascar <- gsub("\\.", "_", newSNs$lascar)
+newSNs <- newSNs[!duplicated(newSNs),]
 
-Lascar_SN_to_ID <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Lascar_SN_to_ID.csv", stringsAsFactors = FALSE)
 
-test <- calib_factors_ordered
-test$SN <- NA
-for (i in 1:nrow(test)) {
-  test$SN[i] <- ifelse(test$lascar[i] %in% Lascar_SN_to_ID$lascar1, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar1 == test$lascar[i]]), test$SN[i])
-  test$SN[i] <- ifelse(is.na(test$SN[i]) & test$lascar[i] %in% Lascar_SN_to_ID$lascar2, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar2 == test$lascar[i] & !is.na(Lascar_SN_to_ID$lascar2)]), test$SN[i])
-  test$SN[i] <- ifelse(is.na(test$SN[i]) & test$lascar[i] %in% Lascar_SN_to_ID$lascar3, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar3 == test$lascar[i] & !is.na(Lascar_SN_to_ID$lascar3)]), test$SN[i])
+calib <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factor_allJan13.csv", stringsAsFactors = FALSE)
+
+calib$lascar <- gsub("C0", "CO", calib$lascar)
+calib$lascar <- gsub("-", "_", calib$lascar)
+calib$lascar <- gsub("\\.", "_", calib$lascar)
+
+calib <- merge(calib, newSNs, by = "lascar", all.x = TRUE) # this adds 6 more rows... because some files are associated with more than one SN/lascar combo?
+
+nrow(calib) #284
+length(unique(calib$SN)) #268
+
+# which SNs have more than one row?
+duplicates <- unique(calib$SN[duplicated(calib$SN)])
+dups <- calib[calib$SN %in% duplicates,]
+dups[order(dups$SN),]
+dups$lascar[is.na(dups$SN)] # 7 lascars have no SN?
+#[1] "CU_CO_253" "CU_CO_257" "CU_CO_259" "CU_CO_268" "CU_CO_274" "CU_CO_276" "CU_CO_283"
+# THESE HAVE BEEN CALIBRATED BUT ARE NOT ASSOCIATED WITH ANY NEW DATA FILES IN THE DROPBOX
+
+
+no_sn <- dups[is.na(dups$SN),]
+
+# the rest of them that do have SNs
+dups <- dups[,3:ncol(dups)]
+dups[dups$SN == 12135 &!is.na(dups$SN),]
+
+flat <- aggregate(x=dups[,1:62], by=list(name=dups$SN), FUN = mean, na.rm = TRUE)
+
+# function to replace NaN with NA
+NaN2NA <- function(x) {
+  z <- gsub("\\s+", NaN, x)  # "\\s+" means match all
+  x[z == NaN] <- NA 
+  return(x)
 }
 
-names(test)[2:14] <- paste0("2014", substr(names(test)[2:14],8,12))
-calib_factors_ordered <- test
+flat2 <- as.data.frame(lapply(X = flat[, 2:ncol(flat)], FUN = NaN2NA))
+flat <- cbind(flat[,1], flat2)
+names(flat)[1] <- "SN"
 
-write.csv(calib_factors_ordered, file = paste0("calib_factors_ordered_", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
+flat <- flat[,c(2:ncol(flat), 1)]
+flat$lascar <- "multiple"
+flat$X <- NA
+flat <- flat[, c(64:65, 1:63)]
 
-calib_factors_ordered <- read.csv("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factors_ordered_Dec19.csv", stringsAsFactors = FALSE)
+# bind them together
 
+calib <- calib[!calib$SN %in% duplicates,]
+calib <- rbind(calib, flat)
+calib <- rbind(calib, no_sn)
 
-# Merge by SN:
-calib_long <- melt(calib_factors_ordered[,c(1:14, 19)], id.vars  = c("SN", "lascar"))
+saveRDS(calib, file = paste0("calib_factor_all_", format(Sys.Date(), format = "%Y%b$d"), ".rds"))
 
+# calculate means
+
+factor_variables <- regmatches(names(calib), regexpr("factor_.*", names(calib)))
+
+calib_factors <- calib[,colnames(calib) %in% c("lascar", "SN", factor_variables)]
+calib_factors$mean <- NA
+calib_factors$sd <- NA
+calib_factors$calibrations <- NA
+calib_factors$mean_excl_0 <- NA
+
+calib_factors$mean <- rowMeans(calib_factors[,2:(ncol(calib_factors)-5)], na.rm = TRUE)
+calib_factors$calibrations <- rowSums(!is.na(calib_factors[,2:(ncol(calib_factors)-5)]))
+
+for (i in 1:nrow(calib_factors)) {
+calib_factors$sd[i] <- sd(calib_factors[i,2:(ncol(calib_factors)-5)], na.rm = TRUE)
+}
+
+for (i in 1:nrow(calib_factors)) {
+  tempdata <- as.numeric(calib_factors[i, 2:(ncol(calib_factors) - 5)])
+  tempdata <- tempdata[!tempdata == 0]
+  calib_factors$mean_excl_0[i] <- mean(tempdata, na.rm = TRUE)
+  }
+
+# 
+calib_factors_ordered <- calib_factors[order(calib_factors$lascar),]
+saveRDS(calib_factors_ordered, file = paste0("calib_factors_ordered_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
+# 
+
+# # Need to start with a  CO_stacked files file.
+# 
+# files <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/12Dec2014/CO_stacked files/")
+# length(files)
+# 
+# SN_data <- as.data.frame(files)
+# SN_data$SN <- regmatches(SN_data[,1], regexpr("_\\d+\\.", SN_data[,1]))
+# SN_data$SN <- substr(SN_data$SN, 2, nchar(SN_data$SN)-1)
+# 
+# lascar_pattern <- "(CO.USB....|COL.USB....|CU.CO....)"
+# SN_data$lascar <- regmatches(SN_data$files, regexpr(lascar_pattern, SN_data$files))
+# SN_data$lascar <- ifelse(substr(SN_data$lascar, start = nchar(SN_data$lascar), stop = nchar(SN_data$lascar)) == "_", substr(SN_data$lascar, 1, nchar(SN_data$lascar)-1),SN_data$lascar)
+# 
+# #208 files, 171 unique SNs, 206 unique lascars....
+# test_table <- data.frame(SN = unique(SN_data$SN))
+# for (i in 1:nrow(test_table)) {
+#   test_table$no_lascars[i] <- length(SN_data$lascar[SN_data$SN == test_table$SN[i]])
+# }
+# test_table$lascar1 <- NA
+# test_table$lascar2 <- NA
+# test_table$lascar3 <- NA
+# for (i in 1:nrow(test_table)) {
+#   test_table$lascar1[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][1]
+#   test_table$lascar2[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][2]
+#   test_table$lascar3[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][3]
+# }
+# 
+# Lascar_SN_to_ID <- test_table
+# write.csv(Lascar_SN_to_ID, file = "Lascar_SN_to_ID.csv", row.names = FALSE)
+# 
+# ######### skip to here
+# 
+# Lascar_SN_to_ID <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Lascar_SN_to_ID.csv", stringsAsFactors = FALSE)
+# 
+# test <- calib_factors_ordered
+# test$SN <- NA
+# for (i in 1:nrow(test)) {
+#   test$SN[i] <- ifelse(test$lascar[i] %in% Lascar_SN_to_ID$lascar1, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar1 == test$lascar[i]]), test$SN[i])
+#   test$SN[i] <- ifelse(is.na(test$SN[i]) & test$lascar[i] %in% Lascar_SN_to_ID$lascar2, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar2 == test$lascar[i] & !is.na(Lascar_SN_to_ID$lascar2)]), test$SN[i])
+#   test$SN[i] <- ifelse(is.na(test$SN[i]) & test$lascar[i] %in% Lascar_SN_to_ID$lascar3, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar3 == test$lascar[i] & !is.na(Lascar_SN_to_ID$lascar3)]), test$SN[i])
+# }
+# 
+# names(test)[2:14] <- paste0("2014", substr(names(test)[2:14],8,12))
+# names(test)[15:32] <- substr(names(test)[15:32],8,nchar(names(test)[15:32]))
+# 
+# 
+# calib_factors_ordered <- test
+# 
+# write.csv(calib_factors_ordered, file = paste0("calib_factors_ordered_", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
+# 
+# calib_factors_ordered_old <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factors_ordered_Dec16.csv", stringsAsFactors = FALSE)
+# 
+# 
+# 
 ######################
 # Plots ----------
 ######################
+# Merge by SN:
+calib_long <- melt(calib_factors_ordered[,c(1:33)], id.vars  = c("SN", "lascar"))
 
 # Plots: each lascar's calibration factors
 
 calib_long <- arrange(calib_long, SN)
-pdf(file = paste0("Lascar_Calibrations_Each_", format(Sys.Date(), format = "%b%d"), ".pdf"), width = 10, height = 7)
-par(mfrow = c(3,4))
-for (i in 1:length(unique(calib_long$SN))) {
-  p <- plot(calib_long$variable[calib_long$SN == unique(calib_long$SN)[i]], calib_long$value[calib_long$SN == unique(calib_long$SN)[i]], ylim = c(0,2), xaxt= "n", ylab = "Calibration Factor", main = paste0("SN =", unique(calib_long$SN)[i], "\n", paste(unique(calib_long$lascar[calib_long$SN == unique(calib_long$SN)[i]]), collapse = " / ")), cex.main = 0.95)
-  axis(1, at = unique(calib_long$variable), labels= substr(unique(calib_long$variable), 2,length(calib_long$variable)), las = 2, cex.axis = 0.7)
+
+pdf(file = paste0("Lascar_Calibrations_Each_", format(Sys.Date(), format = "%Y%b%d"), ".pdf"), width = 10, height = 7)
+par(mfrow = c(3,3))
+has_sn <- unique(calib_long$SN[!is.na(calib_long$SN)])
+for (i in 1:length(has_sn)) {
+  p <- plot(calib_long$variable[calib_long$SN == has_sn[i]], calib_long$value[calib_long$SN == has_sn[i]], ylim = c(0,2), xaxt= "n", ylab = "Calibration Factor", main = paste0("SN =", has_sn[i], "\n", paste(unique(calib_long$lascar[calib_long$SN == has_sn[i] & !is.na(calib_long$SN)]), collapse = " / ")), cex.main = 0.95)
+  axis(1, at = unique(calib_long$variable), labels= substr(unique(calib_long$variable), 8,length(calib_long$variable)), las = 2, cex.axis = 0.7)
   text(x = unique(calib_long$variable), y = p$stats[1,]+0.15, labels = round(p$stats[1,],digits = 2), cex = 0.75)
+}
+
+no_sn <- unique(calib_long$lascar[is.na(calib_long$SN)])
+  for (j in 1:length(no_sn)) {
+  q <- plot(calib_long$variable[calib_long$lascar == no_sn[j]], calib_long$value[calib_long$lascar == no_sn[j]], ylim = c(0,2), xaxt= "n", ylab = "Calibration Factor", main = paste0("SN = NA",  "\n", no_sn[j], collapse = " / "), cex.main = 0.95)
+  axis(1, at = unique(calib_long$variable), labels= substr(unique(calib_long$variable), 8,length(calib_long$variable)), las = 2, cex.axis = 0.7)
+  text(x = unique(calib_long$variable), y = q$stats[1,]+0.15, labels = round(q$stats[1,],digits = 2), cex = 0.75)
 }
 dev.off()
 
@@ -361,10 +492,10 @@ for (i in 1:nrow(dates)) {
 dates$lascars[i] <- sum(!is.na(calib_long$value[calib_long$variable == dates$session[i]]))
 }
 
-pdf(file = paste0("Lascar_Calibrations_All_", format(Sys.Date(), format = "%b%d"), ".pdf"))
+pdf(file = paste0("Lascar_Calibrations_All_", format(Sys.Date(), format = "%Y%b%d"), ".pdf"))
 plot(calib_long$variable, calib_long$value, xaxt = "n", ylab = "Calibration Factor", main = paste("Calibrations of", length(unique(calib_long$SN)), "Lascars"))
-axis(1, at = unique(calib_long$variable), labels= substr(unique(calib_long$variable), 2,length(calib_long$variable)), las = 2, cex.axis = 0.7)
-text(x = unique(calib_long$variable), y = 1.75, labels= paste0("n=\n",dates$lascars), cex = 0.8)
+axis(1, at = unique(calib_long$variable), labels= substr(unique(calib_long$variable), 8,length(calib_long$variable)), las = 2, cex.axis = 0.7)
+text(x = unique(calib_long$variable), y = 1.75, labels= paste0("n=\n",dates$lascars), cex = 0.6)
 dev.off()
 
 
@@ -373,20 +504,25 @@ dev.off()
 #############
 
 
-data <- calib_long
-# new Jan 25
 
 # calculate mean
-mean(calib_long$value[!is.na(calib_long$value)]) # 0.76
-mean(calib_long$value[calib_long$value >= 0.6 & calib_long$value <= 1.2 & !is.na(calib_long$value)]) # 0.85
+mean(calib_long$value[!is.na(calib_long$value)]) # 0.76 / 2016Jan15: 0.67
+mean(calib_long$value[calib_long$value >= 0.6 & calib_long$value <= 1.2 & !is.na(calib_long$value)]) # 0.85 / 2016Jan15: 0.82
 
 
 # calculate monthly averages
+has_sn <-  unique(calib_long$SN[!is.na(calib_long$SN)])
+no_sn <- unique(calib_long$lascar[is.na(calib_long$SN)])
+
+
 monthlycfs <- data.frame()
-for (i in 1:length(unique(calib_long$SN))) {
-  data <- calib_long[calib_long$SN == unique(calib_long$SN)[i],]
-  data$variable <- as.character(substr(data$variable, 2, nchar(as.character(data$variable))))
+
+for (i in 1:length(has_sn)) {
+  data <- calib_long[calib_long$SN == has_sn[i] &!is.na(calib_long$SN),]
+  data$variable <- as.character(substr(data$variable, 8, nchar(as.character(data$variable))))
   data$variable <- gsub("\\..*", "", data$variable)
+  data$variable <- gsub("\\_.*", "", data$variable)
+  data$variable[1:13] <- paste0("2014", data$variable[1:13])
   data$monthyear <- paste(months(ymd(data$variable)), year(ymd(data$variable)), sep = "_")
   d <-dcast(data, monthyear~value, fun.aggregate = mean)
   d$cf <- NA
@@ -403,35 +539,92 @@ for (i in 1:length(unique(calib_long$SN))) {
   monthlycfs <- rbind(monthlycfs, t)
 }
 
-# set up a new data frame for the monthly averaged CFs
-cf <- data.frame(SN = monthlycfs$SN, lascar = monthlycfs$lascar)
-cf[,3:22] <- NA
-colnames(cf)[3:5] <- paste0(c("October", "November", "December"), "_2013")
-colnames(cf)[6:17] <- paste0(c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"), "_2014")
-colnames(cf)[18:22] <- paste0(c("January", "February", "March", "April", "May"), "_2015")
+for (i in 1:length(no_sn)) {
+  data <- calib_long[calib_long$lascar == no_sn[i],]
+  data$variable <- as.character(substr(data$variable, 8, nchar(as.character(data$variable))))
+  data$variable <- gsub("\\..*", "", data$variable)
+  data$variable <- gsub("\\_.*", "", data$variable)
+  data$variable[1:13] <- paste0("2014", data$variable[1:13])
+  data$monthyear <- paste(months(ymd(data$variable)), year(ymd(data$variable)), sep = "_")
+  d <-dcast(data, monthyear~value, fun.aggregate = mean)
+  d$cf <- NA
+  if (colnames(d)[2] != "NA") d$cf <- rowMeans(d[,2:(ncol(d) - 1)], na.rm = TRUE)
+  d$SN <- unique(data$SN)
+  d$lascar <- data$lascar[1]
+  d <- d[,c("monthyear", "SN", "lascar", "cf")]
+  t <-as.data.frame(t(d[,c(1,4)]), stringsAsFactors = FALSE)
+  colnames(t) <- t[1,]
+  t <- t[-1,]
+  t$SN <- unique(d$SN)
+  t$lascar <- d$lascar[1]
+  row.names(t) <- NULL
+  monthlycfs <- rbind(monthlycfs, t)
+}
 
 
-cfs <- merge(cf, monthlycfs, all.y = TRUE)
-cfs <- cfs[,c(1:2, 9:12, 3:4, 13:14, 5:6,15:17,7:8,18:22)]
-saveRDS(cfs, file = paste0("calib_factors_bymonth_", format(Sys.Date(), format = "%b%d"), ".rds")) # monthly averaged CFs (not interpolated)
+
+##### STOPPED HERE --------
+
+# Merge with previous monthlycfs (do I need to do this? NO)
+# cfs_old <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # the factors go through Dec 2014, the old Dec 2014 is MORE COMPLETE than the new Dec 2014 so use the old one
+# cfs_old <- cfs_old[, 1:17] # thru Dec 2014, already ordered
+
+
+# monthlycfs <- monthlycfs[,2:13]
+# order columns
+names(monthlycfs)[1:11] <- paste(substr(names(monthlycfs)[1:11], nchar(names(monthlycfs)[1:11]) - 3, nchar(names(monthlycfs)[1:11])), substr(names(monthlycfs)[1:11], 1, nchar(names(monthlycfs)[1:11]) - 5), "01", sep = "")
+
+# fill in missing months
+monthlycfs[,14:26] <- NA
+names(monthlycfs)[14:26] <- c("2014April01", "2014May01", "2014August01", "2014September01", "2014October01", "2015March01", "2015April01", "2015May01", "2015July01", "2015August01", "2015September01", "2015October01", "2015December01")
+
+monthlycfs <- monthlycfs[, c(12:13, 1:11, 14:26)]
+
+idcol <- monthlycfs[,1:2]
+therest <- monthlycfs[, 3:ncol(monthlycfs)]
+therest <- therest[,order(ymd(names(therest)))]
+
+monthlycfs2 <- cbind(idcol, therest)
+
+
+names(monthlycfs2)[3:ncol(monthlycfs2)] <- substr(names(monthlycfs2)[3:ncol(monthlycfs2)], 1, nchar(names(monthlycfs2)[3:ncol(monthlycfs2)]) - 2)
+
+# add Oct - Dec 2013
+monthlycfs2[, 27:29] <- NA
+names(monthlycfs2)[27:29] <- c("2013October", "2013November", "2013December")
+monthlycfs2 <- monthlycfs2[, c(1:2, 27:29, 3:26)]
+
+# # set up a new data frame for the monthly averaged CFs
+# cf <- data.frame(SN = monthlycfs$SN, lascar = monthlycfs$lascar)
+# cf[,3:29] <- NA
+# colnames(cf)[3:5] <- paste0(c("October", "November", "December"), "_2013")
+# colnames(cf)[6:17] <- paste0(c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"), "_2014")
+# colnames(cf)[18:22] <- paste0(c("January", "February", "March", "April", "May"), "_2015")
+# 
+# 
+# cfs <- merge(cf, monthlycfs, all.y = TRUE)
+# cfs <- cfs[,c(1:2, 9:12, 3:4, 13:14, 5:6,15:17,7:8,18:22)]
+
+
+saveRDS(monthlycfs2, file = paste0("calib_factors_bymonth_", format(Sys.Date(), format = "%Y%b%d"), ".rds")) # monthly averaged CFs (not interpolated)
 
 
 #### INTERPOLATE -------
-cfs <- readRDS("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factors_bymonth_Jan26.rds")
+cfs <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factors_bymonth_2016Jan16.rds")
 cf_new <- cfs
-cf_new[,23:42] <- NA
-conf_names <- paste0(names(cf_new[,3:22]), "_conf")
-for (i in 23:42) { colnames(cf_new)[i] <- conf_names[i-22] }
+cf_new[,30:56] <- NA
+conf_names <- paste0(names(cf_new[,3:29]), "_conf")
+for (i in 30:56) { colnames(cf_new)[i] <- conf_names[i-29] }
 
 # plot:
-pdf(file = paste0("Calib_factors_bymonth_interp_", format(Sys.Date(), format = "%b%d"), ".pdf"), height = 10, width = 10)
+pdf(file = paste0("Calib_factors_bymonth_interp_", format(Sys.Date(), format = "%Y%b%d"), ".pdf"), height = 10, width = 10)
 par(mfrow = c(3,3))
 for (i in 1:nrow(cfs)) {
   xax <- 1:(ncol(cfs) - 2)
   yax <- cfs[i, 3:ncol(cfs)]
  
   #### assigning initial values as the initial measured value
-  yax[1] <- cfs[i,which(!is.na(cfs[i,3:22]))[1]+2]
+  yax[1] <- cfs[i,which(!is.na(cfs[i,3:ncol(cfs)]))[1]+2]
   
   
   plot(xax,yax, pch = 16, col = "red",ylim = c(0,2), main = paste0(cfs$SN[i], " \n", cfs$lascar[i]), ylab = "Calibration Factor", xlab = "", xaxt = "n", cex.main = 0.95)
@@ -484,23 +677,22 @@ for (i in 1:nrow(cfs)) {
 
  ### add x axis and legend
   xlabels <-names(cfs)[3:ncol(cfs)]
-  axis(side = 1, at = xax, labels = paste0(substr(xlabels, 1,3), substr(xlabels, nchar(xlabels)-4, nchar(xlabels))), las = 2, cex.axis = 0.9)
+  axis(side = 1, at = xax, labels = substr(xlabels, 1, 7), las = 2, cex.axis = 0.9)
 
   legend("top", c("virtual", "measured", "hi conf", "lo conf", "no conf"), xpd = TRUE, horiz = TRUE, inset = c(0,0), bty = "n", pch = 16, col = c("red", "black", "lightgreen", "coral", "grey"), cex = 0.8, x.intersp = 0.5)
 
   ### add interpolated values to cf_new
- cf_new[i, 3:22] <- round(allpoints$interp_complete, digits = 3)
- cf_new[i, 23:42] <- allpoints$conf
+ cf_new[i, 3:29] <- round(allpoints$interp_complete, digits = 3)
+ cf_new[i, 30:56] <- allpoints$conf
 }
 dev.off()
 
 
 ## save the interpolated CF factors 
-saveRDS(cf_new, file = paste0("calib_factors_bymonth_interp_", format(Sys.Date(), format = "%b%d"), ".rds"))
+saveRDS(cf_new, file = paste0("calib_factors_bymonth_interp_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
 
 
-
-
+# What to do about long time frames before 1st calibration or after last calibration? Currently, linearly interpolating before & after the first/last measured one, but in some cases a long time passes. Should there be some threshold (e.g. 8 months?) over which the confidence changes?
 
 
 
