@@ -610,7 +610,8 @@ saveRDS(monthlycfs2, file = paste0("calib_factors_bymonth_", format(Sys.Date(), 
 
 
 #### INTERPOLATE -------
-cfs <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factors_bymonth_2016Jan16.rds")
+# NEW - if calib hasn't been done in 8 months, add new level to tail of data: purple(medium)
+cfs <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_2016Jan16.rds")
 cf_new <- cfs
 cf_new[,30:56] <- NA
 conf_names <- paste0(names(cf_new[,3:29]), "_conf")
@@ -622,7 +623,7 @@ par(mfrow = c(3,3))
 for (i in 1:nrow(cfs)) {
   xax <- 1:(ncol(cfs) - 2)
   yax <- cfs[i, 3:ncol(cfs)]
- 
+  
   #### assigning initial values as the initial measured value
   yax[1] <- cfs[i,which(!is.na(cfs[i,3:ncol(cfs)]))[1]+2]
   
@@ -632,58 +633,66 @@ for (i in 1:nrow(cfs)) {
   #### interpolate
   values <- which(!is.na(yax))
   whichzero <- which(as.numeric(yax) < 0.2)[1] #  a "zero" CF is defined as < 0.2
- interp <- approx(xax, yax, n = length(xax), xout = xax, rule = 2) # linear interpolation (rule = 2 sets constant interpolation outside the measured range)
+  interp <- approx(xax, yax, n = length(xax), xout = xax, rule = 2) # linear interpolation (rule = 2 sets constant interpolation outside the measured range)
   interp2 <- approx(xax, yax, xout = xax, method = "constant", rule = 2) # constant interpolation
- if (!is.na(whichzero) & whichzero !=1) interp_complete <- append(interp$y[1: max(values[values< whichzero])], interp2$y[(max(values[values < whichzero])+1):length(interp2$y)]) # linearly interpolate until last measured value before a "zero", then use constant interpolation
- if (is.na(whichzero)) interp_complete <- interp$y # if no "zero", linearly interpolate across the whole range (constant interpolation after last measured point)
- if (whichzero == 1 & !is.na(whichzero)) interp_complete <- interp2$y
-
- # set colors according to CF confidence
- allpoints <- as.data.frame(interp_complete)
- allpoints$colors <- NA
-
- # generally set colors within the "good" range as green and those outside as coral
- allpoints$colors<- ifelse(allpoints$interp_complete > 1.2 | allpoints$interp_complete < 0.6, "coral", "lightgreen")
- # apply coral color and lo confidence to values after a measured value and before a zero
- if (!is.na(whichzero) & whichzero !=1) allpoints$colors[(max(values[values < whichzero])+1):whichzero] <- "coral"
-     
- # apply coral color and lo confidence to entire set of data if there are no 2 adjacent valid measured CFs (including the virtual one as a measured value)
- measured <- as.numeric(yax[!is.na(yax)])
- v <- NULL
- for (j in 1:length(measured) - 1) {
-   v <- append(v, measured[j] >= 0.6 & measured[j+1] >= 0.6 & measured[j] <=1.2 & measured[j+1] <=1.2)
- }
- if(sum(v) == 0) allpoints$colors <- "coral"
- 
-# apply grey color and no confidence to any points with CF < 0.2
- allpoints$colors <- ifelse(allpoints$interp_complete < 0.2, "grey", allpoints$colors)
-
- points(xax, allpoints$interp_complete, pch = 16, col = allpoints$colors)
- 
- # map colors to confidence levels
- allpoints$conf <- mapvalues(allpoints$colors, from = c("lightgreen", "coral", "grey"), to = c("hi", "lo", "none"), warn_missing = FALSE)
- 
-
- 
+  if (!is.na(whichzero) & whichzero !=1) interp_complete <- append(interp$y[1: max(values[values< whichzero])], interp2$y[(max(values[values < whichzero])+1):length(interp2$y)]) # linearly interpolate until last measured value before a "zero", then use constant interpolation
+  if (is.na(whichzero)) interp_complete <- interp$y # if no "zero", linearly interpolate across the whole range (constant interpolation after last measured point)
+  if (whichzero == 1 & !is.na(whichzero)) interp_complete <- interp2$y
+  
+  # set colors according to CF confidence
+  allpoints <- as.data.frame(interp_complete)
+  allpoints$colors <- NA
+  
+  # generally set colors within the "good" range as green and those outside as coral
+  allpoints$colors<- ifelse(allpoints$interp_complete > 1.2 | allpoints$interp_complete < 0.6, "coral", "lightgreen")
+  # apply coral color and lo confidence to values after a measured value and before a zero
+  if (!is.na(whichzero) & whichzero !=1) allpoints$colors[(max(values[values < whichzero])+1):whichzero] <- "coral"
+  
+  # apply coral color and lo confidence to entire set of data if there are no 2 adjacent valid measured CFs (including the virtual one as a measured value)
+  measured <- as.numeric(yax[!is.na(yax)])
+  v <- NULL
+  for (j in 1:length(measured) - 1) {
+    v <- append(v, measured[j] >= 0.6 & measured[j+1] >= 0.6 & measured[j] <=1.2 & measured[j+1] <=1.2)
+  }
+  if(sum(v) == 0) allpoints$colors <- "coral"
+  
+  # apply grey color and no confidence to any points with CF < 0.2
+  allpoints$colors <- ifelse(allpoints$interp_complete < 0.2, "grey", allpoints$colors)
+  
+  
+  # apply purple color and medium confidence to tail of data if it has been more than 8 months since lascar last calibrated and previous calibration was green
+  # last caliberation
+  last <- nrow(allpoints) - which(!is.na(yax[ncol(yax):1]))[1] + 1 # counting backwards 8 months from last column
+  if ((nrow(allpoints) - last > 8) & (allpoints[last,2] == "lightgreen")) { 
+    allpoints$colors[nrow(allpoints):(nrow(allpoints) - (nrow(allpoints) - last - 8))] <- "plum" }
+  
+  # plot points
+  points(xax, allpoints$interp_complete, pch = 16, col = allpoints$colors)
+  
+  # map colors to confidence levels
+  allpoints$conf <- mapvalues(allpoints$colors, from = c("lightgreen", "coral", "plum", "grey"), to = c("hi", "lo", "medium", "none"), warn_missing = FALSE)
+  
+  
+  
   ### add back in the actual measured monthly averages in black
-  points(xax[2:length(xax)], yax[2:length(yax)], pch = 16, col = "black")
-
+  points(xax[2:length(xax)], yax[2:length(yax)], pch = 16, col = "black") # plots all non-NA values of yax
+  
   ### make the first (virtual) point red and add lines at 0.6 and 1.2
   points(xax[1], yax[1], pch = 16, col = "red")
   abline(h=0.6, lty = "dotted", col = "darkgrey")
   abline(h = 1.2, lty = "dotted", col = "darkgrey")
   
-
-
- ### add x axis and legend
+  
+  
+  ### add x axis and legend
   xlabels <-names(cfs)[3:ncol(cfs)]
   axis(side = 1, at = xax, labels = substr(xlabels, 1, 7), las = 2, cex.axis = 0.9)
-
-  legend("top", c("virtual", "measured", "hi conf", "lo conf", "no conf"), xpd = TRUE, horiz = TRUE, inset = c(0,0), bty = "n", pch = 16, col = c("red", "black", "lightgreen", "coral", "grey"), cex = 0.8, x.intersp = 0.5)
-
+  
+  legend("topleft", c("virtual", "measured", "hi", "med", "lo", "none"), xpd = TRUE, horiz = FALSE, inset = c(0,0), bty = "n", pch = 16, col = c("red", "black", "lightgreen", "plum", "coral", "grey"), cex = 0.8, x.intersp = 0.3)
+  
   ### add interpolated values to cf_new
- cf_new[i, 3:29] <- round(allpoints$interp_complete, digits = 3)
- cf_new[i, 30:56] <- allpoints$conf
+  cf_new[i, 3:29] <- round(allpoints$interp_complete, digits = 3)
+  cf_new[i, 30:56] <- allpoints$conf
 }
 dev.off()
 
@@ -692,7 +701,7 @@ dev.off()
 saveRDS(cf_new, file = paste0("calib_factors_bymonth_interp_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
 
 
-# What to do about long time frames before 1st calibration or after last calibration? Currently, linearly interpolating before & after the first/last measured one, but in some cases a long time passes. Should there be some threshold (e.g. 8 months?) over which the confidence changes?
+
 
 
 
