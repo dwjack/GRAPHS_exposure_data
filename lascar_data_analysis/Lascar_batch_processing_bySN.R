@@ -275,7 +275,6 @@ proc.time()-ptm
 
 ########################################### END plot saving ############
 
-## STOPPED HERE JAN 16 -------
 
 allplots <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Jan16/Plots by SN", full.names = TRUE)
 length(allplots) # 174/ 264
@@ -316,7 +315,7 @@ nrow(CO_parameters) #7152
 CO_parameters <- CO_parameters[!is.na(CO_parameters$mean),] # removing NAs
 nrow(CO_parameters) #7152 / 2016 Jan17: 5041
 
-saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds"))
+saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
 
 
 
