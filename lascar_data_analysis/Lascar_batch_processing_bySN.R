@@ -287,19 +287,36 @@ length(allplots) # 174/ 264
 COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Jan16/CO_stacked files",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
 length(COfiles) #174 /264
 
-# # original
-# CO.parameters <- function(x) { 
-#   CO_stacked_bySN <- readRDS(x)
-#   data <- CO_stacked_bySN %>% group_by(file) %>% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], cf_conf = cf_conf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE))
-#   data$hours <- as.numeric(round(difftime(data$lastdate, data$firstdate, units = "hours"), digits = 1))
-#   data
-# }
 
-# new adding first 24h and first 48h
+# new adding day1, day2, day3 24-hour averages, and 72-hour average if available
 CO.parameters <- function(x) { 
   CO_stacked_bySN <- readRDS(x)
-  data <- CO_stacked_bySN %>% group_by(file) %>% summarise(mstudyid = mstudyid[1], cstudyid = cstudyid[1], session = session[1], lascar = lascar[1], SN = SN[1],  firstdate = datetime[1], lastdate = datetime[n()],   mean = mean(co, na.rm = TRUE), sd = sd(co, na.rm = TRUE), q90 = quantile(co, probs = 0.9, na.rm = TRUE), q98 = quantile(co, probs = 0.98, na.rm = TRUE), cf = cf[1], cf_conf = cf_conf[1], mean_corr = mean(co_corr, na.rm = TRUE), sd_corr = sd(co_corr, na.rm = TRUE), q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE), mean_first24_corr = mean(co_corr[datetime < datetime[1] + hours(24)]), mean_first48_corr = mean(co_corr[datetime < datetime[1] + hours(48)]))
-  data$hours <- as.numeric(round(difftime(data$lastdate, data$firstdate, units = "hours"), digits = 1))
+  data <- CO_stacked_bySN %>% 
+    group_by(file) %>% 
+    summarise(mstudyid = mstudyid[1], 
+              cstudyid = cstudyid[1], 
+              session = session[1], 
+              lascar = lascar[1], 
+              SN = SN[1],  
+              firstdate = datetime[1], 
+              lastdate = datetime[n()], 
+              co_mean = mean(co, na.rm = TRUE), 
+              co_sd = sd(co, na.rm = TRUE), 
+              co_q90 = quantile(co, probs = 0.9, na.rm = TRUE), 
+              co_q98 = quantile(co, probs = 0.98, na.rm = TRUE), 
+              co_cf = cf[1], 
+              co_cf_conf = cf_conf[1], 
+              co_mean_corr = mean(co_corr, na.rm = TRUE), 
+              co_sd_corr = sd(co_corr, na.rm = TRUE), 
+              co_q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), 
+              co_q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE), 
+          
+              co_day1_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 24, mean(co_corr[datetime < datetime[1] + hours(24)], na.rm = TRUE), NA), 
+              co_day2_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 48, mean(co_corr[datetime >= datetime[1] + hours(24) & datetime < datetime[1] + hours(48)], na.rm = TRUE), NA), 
+              co_day3_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 72, mean(co_corr[datetime >= datetime[1] + hours(48) & datetime < datetime[1] + hours(72)], na.rm = TRUE), NA), 
+              co_mean_first48_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 48, mean(co_corr[datetime < datetime[1] + hours(48)], na.rm = TRUE), NA),  
+              co_mean_first72_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 72, mean(co_corr[datetime < datetime[1] + hours(72)], na.rm = TRUE), NA),
+              co_hours = as.numeric(round(difftime(datetime[n()], datetime[1], units = "hours"), digits = 1)))
   data
 }
 
@@ -307,12 +324,13 @@ CO_parameters <- ldply(COfiles, CO.parameters, .progress = "text")
 
 CO_parameters$lascar <- gsub("\\.", "_", CO_parameters$lascar)
 
+CO_parameters$co_cf_conf[CO_parameters$co_cf_conf == "medium"] <- "lo" # had medium for the tail end if > 8 months since calibrated, change to lo
 
 length(unique(CO_parameters$lascar)) # 210
 length(unique(CO_parameters$SN)) #174
-nrow(CO_parameters) #7152
+nrow(CO_parameters) #7152 / 5041
 
-CO_parameters <- CO_parameters[!is.na(CO_parameters$mean),] # removing NAs
+CO_parameters <- CO_parameters[!is.na(CO_parameters$co_mean),] # removing NAs
 nrow(CO_parameters) #7152 / 2016 Jan17: 5041
 
 saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
