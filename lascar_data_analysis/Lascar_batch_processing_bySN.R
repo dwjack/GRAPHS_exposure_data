@@ -88,7 +88,7 @@ saveRDS(Lascar_data, file = paste0("Lascar_SN_data_", format(Sys.Date(), format 
 
 # match the CF (pulls the CF from the month of the last day of monitoring) - see "lascar_calibration_Jan2016.R"
 Lascar_data <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Lascar_SN_data_2016Jan17.rds")
-cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Jan17.rds")
+cf_new <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Jan31.rds")
 
 Lascar_data$monthyear <- paste0(substr(Lascar_data$monthyear, nchar(Lascar_data$monthyear)-3, nchar(Lascar_data$monthyear)), substr(Lascar_data$monthyear, 1, nchar(Lascar_data$monthyear) - 5))
 

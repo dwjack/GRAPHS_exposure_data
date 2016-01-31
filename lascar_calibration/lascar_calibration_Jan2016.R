@@ -5,7 +5,7 @@
 
 # Interpolation of CFs follows the documentation in "GRAPHS Lascar CO Data Validation Plan_V2"
 
-# note that on some computers the pathname is ~/Dropbox/Ghana_exposure_data_SHARED_2014 while on others it is ~/Dropbox/Ghana_exposure_data_SHARED_2014
+# note that on some computers the pathname is ~/Dropbox/Ghana_exposure_data_SHARED_2014 while on others it is ~/Dropbox/Ghana_exposure_data_SHARED (1)
 # do a replace-all
 
 require(plyr)
@@ -25,13 +25,13 @@ lascar.import <- function(x){
 }
 
 ## Previously calculated: through June, 2015
-calib_factor_all_old <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factor_allOct06.csv")
-calib_factor_all <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factor_allJan13.csv")
+calib_factor_all_old <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allOct06.csv")
+calib_factor_all <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allJan13.csv")
 
 # Monthly factors interpolated: through Jan 2015
 # /Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files
 
-previous <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # merged by SN, not interpolated
+previous <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # merged by SN, not interpolated
 
 # New dates to do: 
 # 17Jan15 second cali
@@ -610,8 +610,8 @@ saveRDS(monthlycfs2, file = paste0("calib_factors_bymonth_", format(Sys.Date(), 
 
 
 #### INTERPOLATE -------
-# NEW - if calib hasn't been done in 8 months, add new level to tail of data: purple(medium)
-cfs <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_2016Jan16.rds")
+# NEW - if calib hasn't been done in 8 months, tail of data coral
+cfs <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_2016Jan16.rds")
 cf_new <- cfs
 cf_new[,30:56] <- NA
 conf_names <- paste0(names(cf_new[,3:29]), "_conf")
@@ -660,17 +660,17 @@ for (i in 1:nrow(cfs)) {
   allpoints$colors <- ifelse(allpoints$interp_complete < 0.2, "grey", allpoints$colors)
   
   
-  # apply purple color and medium confidence to tail of data if it has been more than 8 months since lascar last calibrated and previous calibration was green
+  # apply coral color and lo confidence to tail of data if it has been more than 8 months since lascar last calibrated and previous calibration was green
   # last caliberation
   last <- nrow(allpoints) - which(!is.na(yax[ncol(yax):1]))[1] + 1 # counting backwards 8 months from last column
   if ((nrow(allpoints) - last > 8) & (allpoints[last,2] == "lightgreen")) { 
-    allpoints$colors[nrow(allpoints):(nrow(allpoints) - (nrow(allpoints) - last - 8))] <- "plum" }
+    allpoints$colors[nrow(allpoints):(nrow(allpoints) - (nrow(allpoints) - last - 8))] <- "coral" }
   
   # plot points
   points(xax, allpoints$interp_complete, pch = 16, col = allpoints$colors)
   
   # map colors to confidence levels
-  allpoints$conf <- mapvalues(allpoints$colors, from = c("lightgreen", "coral", "plum", "grey"), to = c("hi", "lo", "medium", "none"), warn_missing = FALSE)
+  allpoints$conf <- mapvalues(allpoints$colors, from = c("lightgreen", "coral","grey"), to = c("hi", "lo", "none"), warn_missing = FALSE)
   
   
   
@@ -688,7 +688,7 @@ for (i in 1:nrow(cfs)) {
   xlabels <-names(cfs)[3:ncol(cfs)]
   axis(side = 1, at = xax, labels = substr(xlabels, 1, 7), las = 2, cex.axis = 0.9)
   
-  legend("topleft", c("virtual", "measured", "hi", "med", "lo", "none"), xpd = TRUE, horiz = FALSE, inset = c(0,0), bty = "n", pch = 16, col = c("red", "black", "lightgreen", "plum", "coral", "grey"), cex = 0.8, x.intersp = 0.3)
+  legend("topleft", c("virtual", "measured", "hi", "lo", "none"), xpd = TRUE, horiz = FALSE, inset = c(0,0), bty = "n", pch = 16, col = c("red", "black", "lightgreen", "coral", "grey"), cex = 0.8, x.intersp = 0.3)
   
   ### add interpolated values to cf_new
   cf_new[i, 3:29] <- round(allpoints$interp_complete, digits = 3)
