@@ -26,14 +26,14 @@ require(reshape2)
 files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=T) 
 length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681
 
-# Exclude files that have been processed previously
-CO_parameters <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_parameters_7152sessions_Feb03.rds")
-summary(CO_parameters) # no NAs for validity
-nrow(CO_parameters) # 6619 previously validated files from Feb 2015
+# Only include previously unvalidated files 
+unvalidated <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_unvalidated_4734sessions_Jan30.rds")
 
-files <- files[!basename(files) %in% CO_parameters$file]
-length(files) # 5064
-sum(duplicated(basename(files))) #4 are duplicated
+nrow(unvalidated) # 4734
+
+files <- files[basename(files) %in% unvalidated$file]
+length(files) # 
+sum(duplicated(basename(files))) # should be 0?
 
 # make a data frame of the files
 Lascar_data <- data.frame(file = files, stringsAsFactors = FALSE)
@@ -284,8 +284,13 @@ length(allplots) # 174/ 264
 ####################################################################
 # This is generating an equivalent list of NAs?
 
-COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Jan16/CO_stacked files",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
-length(COfiles) #174 /264
+# older
+COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/CO_stacked files/",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
+length(COfiles) #174 
+
+# new Jan 2016
+COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/2016Jan16/CO_stacked files",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
+length(COfiles) #264
 
 
 # new adding day1, day2, day3 24-hour averages, and 72-hour average if available
@@ -297,7 +302,7 @@ CO.parameters <- function(x) {
               cstudyid = cstudyid[1], 
               session = session[1], 
               lascar = lascar[1], 
-              SN = SN[1],  
+              sn = SN[1],  
               firstdate = datetime[1], 
               lastdate = datetime[n()], 
               co_mean = mean(co, na.rm = TRUE), 
@@ -323,7 +328,8 @@ CO.parameters <- function(x) {
 CO_parameters <- ldply(COfiles, CO.parameters, .progress = "text")
 
 CO_parameters$lascar <- gsub("\\.", "_", CO_parameters$lascar)
-
+CO_parameters$file_all <- CO_parameters$file
+CO_parameters$file <- basename(CO_parameters$file_all)
 CO_parameters$co_cf_conf[CO_parameters$co_cf_conf == "medium"] <- "lo" # had medium for the tail end if > 8 months since calibrated, change to lo
 
 length(unique(CO_parameters$lascar)) # 210
@@ -401,9 +407,9 @@ rows # 6623
 
 unique(CO_validation$CO_VALID) # check that only contains 1,2,3, and NA. If not, go back to forms and fix!
 
-# merge by "file" in validation files (need to create similar variable in CO_parameters)
-CO_parameters$file_all <- CO_parameters$file
-CO_parameters$file <- basename(CO_parameters$file)
+# # merge by "file" in validation files (need to create similar variable in CO_parameters)
+# CO_parameters$file_all <- CO_parameters$file
+# CO_parameters$file <- basename(CO_parameters$file)
 
 CO_all <- merge(CO_parameters, CO_validation[,c("file", "CO_VALID", "NOTES_NOTES_NOTES", "Validated.by")], all.x = TRUE, by = "file")
 
@@ -425,7 +431,7 @@ CO_all$validated.by <- blank2na(CO_all$validated.by)
 
 
 ### Calculate duration validity: 1 if >=44 hours, 2 if between 18 and 44 hours, 3 if < 18 hours -------
-CO_all$duration_valid <- ifelse(CO_all$hours >=44, 1, ifelse(CO_all$hours >=18, 2, 3))
+CO_all$duration_valid <- ifelse(CO_all$co_hours >=44, 1, ifelse(CO_all$co_hours >=18, 2, 3))
 
 ### Calculate overall validity
  ## 1 If cf_conf hi, visual validity =1 , duration =1
@@ -434,7 +440,7 @@ CO_all$duration_valid <- ifelse(CO_all$hours >=44, 1, ifelse(CO_all$hours >=18, 
  ## 3 if cf_conf lo, visual validity =1 or 2, duration =1 or 2
  ## 4 if visual validity= 3 or duration = 3 or cf_conf = none
 
-CO_all$overall_valid <- ifelse(CO_all$cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 1, 1, ifelse(CO_all$cf_conf == "hi" & CO_all$visually_valid ==2 & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 2, ifelse(CO_all$cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 2, 2, ifelse(CO_all$cf_conf == "lo" & (CO_all$visually_valid == 1 | CO_all$visually_valid == 2) & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 3, ifelse(CO_all$visually_valid == 3 | CO_all$duration_valid == 3 | CO_all$cf_conf == "none", 4, NA)))))
+CO_all$overall_valid <- ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 1, 1, ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid ==2 & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 2, ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 2, 2, ifelse(CO_all$co_cf_conf == "lo" & (CO_all$visually_valid == 1 | CO_all$visually_valid == 2) & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 3, ifelse(CO_all$visually_valid == 3 | CO_all$duration_valid == 3 | CO_all$co_cf_conf == "none", 4, NA)))))
 
 # Check forms
 colSums(is.na(CO_all))
@@ -445,6 +451,57 @@ CO_all <- CO_all[!is.na(CO_all$visually_valid),]
 nrow(CO_all) #6619
 
 ### save
-saveRDS(CO_all, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds"))
+saveRDS(CO_all, file = paste0("CO_parameters_validated_", nrow(CO_all), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds"))
 
-write.csv(CO_all, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%b%d"), ".csv"))
+write.csv(CO_all, file = paste0("CO_parameters_validated_", nrow(CO_all), "sessions_", format(Sys.Date(), format = "%b%d"), ".csv"))
+
+
+
+## Combine and remove duplicates
+params1 <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_validated_6619sessions_Jan30.rds")
+params2 <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_5041sessions_2016Jan30.rds")
+
+params1$set <- "params1"
+params2$set <- "params2"
+params <- rbind.fill(params1, params2) #11660 rows
+params$cstudyid <- blank2na(params$cstudyid)
+params$ids <- paste(as.character(params[,6]), as.character(params[,7]), as.character(params[,8]))
+
+sum(duplicated(params)) #0
+sum(duplicated(params$file)) #0
+
+
+sum(duplicated(params[,2:24])) # 268 just have formatting probs with file
+params <- params[!duplicated(params[,2:24]),] #11392 rows
+
+sum(duplicated(params$ids)) #39
+dups <- params$ids[duplicated(params$ids)] 
+
+duprows <- params[params$ids %in% dups,] #78
+duprows <- arrange(duprows, ids)
+
+duprows[,c("file",  "sn", "lastdate", "set", "visually_valid", "visual_notes", "overall_valid")]
+# these are weird ones where the same file is assigned to two studyids. ASSUME THE ONE FROM PARAMS2 (later set) IS CORRECT? Maybe just leave these in for future appraisal.
+
+# make the validation notes the same for the duplicated rows
+for (i in seq(from = 1, to = 78, by = 2)) {
+  for(j in 26:30) {
+    duprows[i+1,j] <- duprows[i,j]
+  }
+}
+
+duprows$is_duplicated <- TRUE
+
+params <- params[!params$file %in% duprows$file,]
+params$is_duplicated <- FALSE
+
+params <- rbind(params, duprows) # 11392
+
+saveRDS(params, file = paste0(paste0("CO_parameters_all_", nrow(params), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds")))
+
+unvalidated <- params[is.na(params$visually_valid),]
+saveRDS(unvalidated, file = paste0(paste0("CO_parameters_unvalidated_", nrow(unvalidated), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds")))
+
+# problems: the plots are not going to line up with the validation files because of the removed duplicates, need to redo
+
+
