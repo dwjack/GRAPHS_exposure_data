@@ -501,15 +501,5 @@ saveRDS(unvalidated, file = paste0(paste0("CO_parameters_unvalidated_", nrow(unv
 
 #########################################
 
-# Add arm information
-params1 <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_parameters_validated_6619sessions_Jan30.rds")
-
-arms <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/arms.csv", stringsAsFactors = FALSE)
-
-params <- params1
-params$village_code <- ifelse(!regexpr("(vil_.._ms|Vil_.._ms)", params$file_all) == -1, toupper(substr(regmatches(params$file_all, (regexpr("(vil_.._ms|Vil_.._ms)", params$file_all))), 5,6)), NA)
-sum(is.na(params$village_code)) # 0
-nrow(params[params$village_code == "AC",]) #13
-params <- merge(params, arms, by = "village_code", all.x = TRUE)
 
 
