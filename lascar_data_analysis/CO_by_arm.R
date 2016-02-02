@@ -6,9 +6,9 @@ library(tidyr)
 library(gridExtra)
 
 # Add arm information -------
-params <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_parameters_validated_6619sessions_Jan30.rds")
+params <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_validated_6619sessions_Jan30.rds")
 
-arms <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/arms.csv", stringsAsFactors = FALSE)
+arms <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED (1)/arms.csv", stringsAsFactors = FALSE)
 AC <- data.frame(village_code = "AC", arm = 2, arm2 = "biolite")
 arms <- rbind(arms, AC)
 params$village_code <- ifelse(!regexpr("(vil_.._ms|Vil_.._ms)", params$file_all) == -1, toupper(substr(regmatches(params$file_all, (regexpr("(vil_.._ms|Vil_.._ms)", params$file_all))), 5,6)), NA)
@@ -112,4 +112,13 @@ p2<-p2 + geom_line(data = df1, aes(x = a, y = b)) + annotate("text", x = 2, y = 
 print(p2)
 dev.off()
 
+# beanplot of baseline CO exposure -----------------
+library(beanplot)
 
+pdf(file = "Baseline_CO_Beanplot_all.pdf", bg = "white")
+beanplot(pre$co_mean_corr, ylab = "Mean CO (ppm)", col = c("grey", "darkgreen"), main = "Baseline CO Exposure (n = 973)")
+dev.off()
+
+pdf(file = "Baseline_CO_Beanplot_byarm.pdf", bg = "white")
+beanplot(co_mean_corr ~ arm2, data = pre, ylab = "Mean CO (ppm)", col = c("grey", "darkgreen"), main = "Baseline CO Exposure by Arm (n = 973)")
+dev.off()
