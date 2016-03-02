@@ -2,18 +2,25 @@
 #stack the calibration data and plot it
 #created 24 Feb 2014
 # modified 16 Jan 2016
+## SOME PARTS OF THIS SCRIPT (SECTION 4 ON) MIGHT NEED WORK
+
 
 # Interpolation of CFs follows the documentation in "GRAPHS Lascar CO Data Validation Plan_V2"
 
 # note that on some computers the pathname is ~/Dropbox/Ghana_exposure_data_SHARED_2014 while on others it is ~/Dropbox/Ghana_exposure_data_SHARED (1)
 # do a replace-all
 
+
+
+############ SECTION 0: LOAD PACKAGES AND FUNCTIONS ############
+# load packages
 require(plyr)
 require(dplyr)
 require(ggplot2)
 require(lubridate)
 require(scales)
 library(lattice)
+library(reshape2)
 
 # functions
 lascar.import <- function(x){
@@ -24,41 +31,21 @@ lascar.import <- function(x){
   dt
 }
 
-## Previously calculated: through June, 2015
-calib_factor_all_old <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allOct06.csv")
-calib_factor_all <- read.csv("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allJan13.csv")
-
-# Monthly factors interpolated: through Jan 2015
-# /Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files
-
+## If this is not the first time you are calculating CFs, load the previously calculated ones (otherwise skip)
 previous <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # merged by SN, not interpolated
 
-# New dates to do: 
-# 17Jan15 second cali
-# 28Jan2015_1 THROUGH _2 
-# 30Jan2015_1 through _2 
-# 31Jan2015 
-# 02Feb2015_1 through _4
-# 09Feb2015_1 through _2
-# 27Jun2015_1 through _2
-# 30Jun2015 # did I do through here? Yes. in calib_factor_allOct06 - the calib factors
 
-# 17Nov2015
-# 20Nov2015
-# 21Nov2015
+###### SECTION 1: PROCESSING ONE "RUN" (FOLDER OF CALIBRATION DATA FROM ONE RUN) ##########
 
+# enter the path to, and the name of, the calibration run to examine  - this is the name of the folder in which the data from the calibration run is contained. Note that this folder should only contain data from ONE RUN (three jars of Lascars, max, that were run simultaneously, so max 36 files). Sometimes multiple runs occur on one day - these need to be separated out into different folders by "run". It will be obvious from the plot if multiple runs are in one folder - there will be bunches of Lascars with peaks at different times. You can try to figure out the separate runs from the plots or by looking at the logsheets, and move this data into separate folders.) Also set the parent folder (the first part of the directory path to the run)
 
-###### 
-# Original runs -------
-###############################################
-#enter file to examine (calibration run)
-###############################################
+parentfolder <- "/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/"
 run <- "21Nov2015"   
-###############################################
-###############################################
 
-path<-paste("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/", run, sep="")
-path
+# set the path using the above info
+path<-paste(parentfolder, run, sep="")
+
+# list the files in the folder
 files<-list.files(path,full.names=T, recursive = FALSE, include.dirs = FALSE)
 length(files) # one run is max 12*3 = 36 files?
 
@@ -66,8 +53,9 @@ files <- files[which(regexpr("ogsheet", files) == -1)] # get rid of logsheets
 length(files) # one run is max 12*3 = 36 files?
 
 names(files)<-basename(files)
-calib <- ldply(files,lascar.import)
 
+# import the data
+calib <- ldply(files,lascar.import)
 
 
 #create lascar variable
@@ -76,6 +64,7 @@ lascar_match<-regexpr(lascar_pattern, calib$.id)
 calib$lascar<-regmatches(calib$.id, lascar_match)
 
 
+# plot the run
 ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line() + ggtitle(run)
 
 # lattice plot to check individual plots
@@ -87,68 +76,74 @@ pdf(file = paste0("Calib_plot_", run, ".pdf"))
 ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line() + ggtitle(run)
 dev.off()
 
-#check times - some of the lasars appear to be set to the wrong time.
-meantime<-calib %>% group_by(lascar) %>% dplyr::summarise(datetime=mean(datetime),mean(co)) %>% arrange(desc(datetime))
-meantime <- as.data.frame(meantime)
-meantime[,2] <- as.POSIXct(meantime[,2], origin="1970-01-01", tz='UTC')
+############ SECTION 2: INSPECT PLOT, CORRECT PROBLEMS, SELECT PLATEAU REGION TO USE FOR CF ########
 
-meantime #table for inspection
-
-################################################
-# CHECK PLOT AND MEANTIME AND PROCEED VIA EYEBALL
-#################################################
-
-p <- meantime[meantime$datetime > as.POSIXct("2015-06-27 10:11", origin = "1970-1-1", tz = "GMT"),]
-p[order(p$lascar),]
-
-# ###############################################
-# # drop any problem records and replot
-# ###############################################
+#check times - some of the lasars appear to be set to the wrong time 
+### NOTE: (this has not happened in a while so I'm commenting this section out).
+# meantime<-calib %>% group_by(lascar) %>% dplyr::summarise(datetime=mean(datetime),mean(co)) %>% arrange(desc(datetime))
+# meantime <- as.data.frame(meantime)
+# meantime[,2] <- as.POSIXct(meantime[,2], origin="1970-01-01", tz='UTC')
 # 
-# for Jan 28_1
-calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-28 10:30:00", origin = "1970-1-1", tz = "GMT"),]
+# meantime #table for inspection
 
-# for Jan 28_2
-calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-28 14:00:00", origin = "1970-1-1", tz = "GMT"),]
 
-# for Jan 30_1
-calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-30 12:35:00", origin = "1970-1-1", tz = "GMT"),]
+##### Section 2a: CHECK PLOT AND MEANTIME AND PROCEED VIA EYEBALL #####
 
-calib_cleaned <- calib %.% filter(lascar!="CU_CO_154" & lascar!= "CU_CO_152") 
-# Mar 3_1: 114,  
-# Mar-3_2 112, 020 (there are two called 020). 
-# Mar 11: 114, 126 
-# Jul 5: 114. 
-# Nov 28: 114. 
-# Jun272015_1: 056
-# Jun272015_2: 154, 152
+# Make a calib_cleaned dataset that excludes any problem records/problem spikes, etc.  Things that might happen in this section: 
+#### Remove a particular Lascar that seems to have been calibrated in a different run (different time). 
+#### Truncate the beginning or end of the plot to help visualize the middle. 
+#### Get rid of an extraneous "spike" in the data. 
 
-#repeat this row to remove additonal units from the plot
+# NOTE: For each of these I've made comments below as to which files I modified, this commenting is not strictly necessary. You just need to end up with a calib_cleaned file. 
 
+###### IF THERE ARE NO PROBLEMS YOU NEED TO ADDRESS:
+calib_cleaned <- calib
+
+###### TO TRUNCATE BY TIME
+# # for Jan 28_1
+# calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-28 10:30:00", origin = "1970-1-1", tz = "GMT"),]
 # 
-ggplot(calib_cleaned,aes(x=datetime,y=co,colour=lascar))+geom_line()
+# # for Jan 28_2
+# calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-28 14:00:00", origin = "1970-1-1", tz = "GMT"),]
+# 
+# # for Jan 30_1
+# calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-30 12:35:00", origin = "1970-1-1", tz = "GMT"),]
+
+###### TO REMOVE INDIVIDUAL LASCAR FILES
+# calib_cleaned <- calib %.% filter(lascar!="CU_CO_154" & lascar!= "CU_CO_152") 
+# # Mar 3_1: 114,  
+# # Mar-3_2 112, 020 (there are two called 020). 
+# # Mar 11: 114, 126 
+# # Jul 5: 114. 
+# # Nov 28: 114. 
+# # Jun272015_1: 056
+# # Jun272015_2: 154, 152
+# 
+# #repeat this row to remove additonal units from the plot
+# 
+###### TO GET RID OF SPIKES THAT ARE VASTLY OUT OF RANGE
+# ### if needed, get rid of weird spikes & replot (set the > & < values by eyeball)-----
+# calib_cleaned <- calib_cleaned %.% filter(co > 38 & co <55)
+
+
+# Plot the calib_cleaned data, check to make sure it looks ok, otherwise go back to top of section and readdress the problems until you're satisfied. 
+ggplot(calib_cleaned,aes(x=datetime,y=co,colour=lascar))+geom_line()+scale_x_datetime(breaks = date_breaks("min"), labels = date_format("%H:%M"))
 
 xyplot(co ~ datetime|lascar, data=calib_cleaned, type='l')
 
-### if needed, get rid of weird spikes & replot (set the > & < values by eyeball)-----
-calib_cleaned <- calib_cleaned %.% filter(co > 38 & co <55)
-
-ggplot(calib_cleaned,aes(x=datetime,y=co,colour=lascar))+geom_line()+scale_x_datetime(breaks = date_breaks("min"), labels = date_format("%H:%M"))
 
 
-####################################
-# if no problems
-###################################
 
-calib_cleaned <- calib
+### SECTION 2b: select the "middle" 5-10 minute section of the plateau by eyeball and/or by referring to times on logsheets ############
 
-####################################
-### select the "middle" 5-10 minute section of the plateau by eyeball or by referring to times on logsheets-----
-###################################
+calib_cleaned$datetime[1] # get the first datetime and modify it to the desired window
 
-calib_cleaned$datetime[1]
+##### SET THE START AND STOP TIME
+starttime <- "2015-11-21 07:38" 
+stoptime <- "2015-11-21 07:42"
 
-# Times used:
+
+# Record the times used as a comment:
 # Feb 24: "2014-02-24 16:38" / "2014-02-24 16:42"
 # Feb 27: "2014-02-27 16:29"/"2014-02-27 16:39"
 # Mar 03_1: "2014-03-03 09:13" / "2014-03-03 09:23"
@@ -183,217 +178,92 @@ calib_cleaned$datetime[1]
 # Nov 21: "2015-11-21 07:38" / "2015-11-21 07:42"
 
 
-starttime <- "2015-11-21 07:38" 
-stoptime <- "2015-11-21 07:42"
 
+# subset the data to the shorter window, and plot. Make sure it looks ok (captures the plateau, no huge spikes within the window)
 calib_factor<- calib_cleaned %>% filter(datetime > ymd_hm(starttime, tz = "GMT") & datetime < ymd_hm(stoptime, tz = "GMT"))
 
 ggplot(calib_factor,aes(x=datetime,y=co,colour=lascar))+geom_line()+scale_x_datetime(breaks = date_breaks("min"), labels = date_format("%H:%M"))
 
+# save the truncated plot
 pdf(file = paste0("Calib_plot_trunc_", run, ".pdf"))
 ggplot(calib_factor,aes(x=datetime,y=co,colour=lascar))+geom_line()+scale_x_datetime(breaks = date_breaks("min"), labels = date_format("%H:%M"))
 dev.off()
 
-# calculate the calibration factor
-calib_factor <- calib_factor %>% group_by(lascar) %>% dplyr::summarise(co = mean(co), factor = round(co/50, digits = 3))
+############## SECTION 2c: calculate the calibration factors for this run ############
+
+calib_factor <- calib_factor %>% group_by(SN) %>% dplyr::summarise(lascar = lascar[1], co = mean(co), factor = round(co/50, digits = 3))
 
 
-###################################################
-### choose a date
-###################################################
+### choose a run date/name to use when saving the data. If the folder is named by date e.g. "2015Feb02", run line one. If there were multiple runs, run line 2 by adding the name of the run at the end, eg "2015Feb02_1". 
+
 date <-  format(dmy(run, tz = "GMT"), format = "%Y%b%d") # for any dates with only one run
 # date <- "2015Feb02_3" # For eg  March 03 and Dec 01 when there were 2 runs
 
 
-
 #name columns and create a date-stamped data frame ----
-
-
-
-names(calib_factor) <- c("lascar", paste0("co_", date), paste0("factor_", date))
+names(calib_factor) <- c("SN", "lascar", paste0("co_", date), paste0("factor_", date))
 calib_factor$lascar <- gsub("CU_C0", "CU_CO", calib_factor$lascar)
 
-####################
-# Assign any grossly problematic units to 0
-####################
+
+####### Look at calib_factor: Assign any grossly problematic units to 0
+
 # Nov 20: CU_CO_240
 # calib_factor[calib_factor$lascar == "CU_CO_240",2:3] <- 0
 
+# assign your designated name to an object in your environment (note - this does not SAVE the data - it just creates an object that you will merge with other data later)
 assign(paste0("calib_factor_", date),calib_factor)
 
 
 
+############# END OF SINGLE RUN PROCESSING. PROCEED FROM THE TOP WITH THE NEXT RUN ############
+# Note! You have not saved the calibration factors to file yet. 
+
+
+##################################### SECTION 3: MERGE THE RUNS ###############
+# After doing each run of calibrations separately, merge the data frames--------
+# Each run will be assigned a name such as "calib_factor_Mar03_2". Find all these names and merge the data. 
 
 
 
-
-#####################################
-# After doing each folder of calibrations separately, merge the data frames--------
-####################################
-
-
-########################
-# If doing them for the first time, without loading a calib_factor_all file
-# calib_factor_all <- join_all(list(calib_factor_Feb24, calib_factor_Feb27, calib_factor_Mar03_1, calib_factor_Mar03_2, calib_factor_Mar11, calib_factor_Jun17, calib_factor_Jul05, calib_factor_Jul07, calib_factor_Jul08, calib_factor_Nov28, calib_factor_Dec01_1, calib_factor_Dec01_2), by = "lascar", type = "full")
-########################
+########### SECTION 3a:  If doing them for the first time, without loading a previous calib_factor_all file ######
+# Replace the names in the list with the calib_factor_ datasets you created in Section 2.
+calib_factor_all <- join_all(list(calib_factor_Feb24, calib_factor_Feb27, calib_factor_Mar03_1, calib_factor_Mar03_2, calib_factor_Mar11, calib_factor_Jun17, calib_factor_Jul05, calib_factor_Jul07, calib_factor_Jul08, calib_factor_Nov28, calib_factor_Dec01_1, calib_factor_Dec01_2), by = "SN", type = "full")
 
 
-#######################   START HERE IF ADDING TO A PREVIOUSLY ESTABLISHED FILE --------
-# If adding to a previously established file
-########################
 
+######### Section 3b:   START HERE IF ADDING TO A PREVIOUSLY ESTABLISHED FILE ##########
 
+# load the previously established file
 calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factor_allOct06.csv", stringsAsFactors = FALSE)
 
-calib_factor_all <- join_all(list(calib_factor_all, calib_factor_2015Nov17, calib_factor_2015Nov20, calib_factor_2015Nov21), by = "lascar", type = "full")
+# merge the newly processed runs with the previous data
+calib_factor_all <- join_all(list(calib_factor_all, calib_factor_2015Nov17, calib_factor_2015Nov20, calib_factor_2015Nov21), by = "SN", type = "full") 
 
 
-
-########################
-
+########### SECTION 3c: Make names consistent and save the new file ######
+# make Lascar names consistent
 calib_factor_all$lascar <- gsub("CU_C0", "CU_CO", calib_factor_all$lascar)
 calib_factor_all <- calib_factor_all[order(calib_factor_all$lascar),]
 
-
+# save the calib factors
 write.csv(calib_factor_all, file = paste0("calib_factor_all", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
 
 
 
-# ### split out the calibration factors
-# calib_factor_all <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factor_allJan13.csv")
-# factor_variables <- regmatches(names(calib_factor_all), regexpr("factor_.*", names(calib_factor_all)))
-# 
-# calib_factors <- calib_factor_all[,colnames(calib_factor_all) %in% c("lascar", factor_variables)]
-# calib_factors$mean <- NA
-# calib_factors$sd <- NA
-# calib_factors$calibrations <- NA
-# calib_factors$mean_excl_0 <- NA
-# 
-# calib_factors$mean <- rowMeans(calib_factors[,2:(ncol(calib_factors)-4)], na.rm = TRUE)
-# calib_factors$calibrations <- rowSums(!is.na(calib_factors[,2:(ncol(calib_factors)-4)]))
-# 
-# for (i in 1:nrow(calib_factors)) {
-# calib_factors$sd[i] <- sd(calib_factors[i,2:(ncol(calib_factors)-4)], na.rm = TRUE)
-# }
-# 
-# for (i in 1:nrow(calib_factors)) {
-#   tempdata <- as.numeric(calib_factors[i, 2:(ncol(calib_factors) - 4)])
-#   tempdata <- tempdata[!tempdata == 0]
-#   calib_factors$mean_excl_0[i] <- mean(tempdata, na.rm = TRUE)
-#   }
-# 
-# 
-# calib_factors_ordered <- calib_factors[order(calib_factors$lascar),]
-# 
-# # stopped here Jan 13
-
-###################################
-## Add SNs to calib_factors_ordered
-###################################
-
-
-#### DO this if need to generate new SNs, otherwise skip
-# start with Lascar_SN_data from Lascar_batch_processing_bySN.R
-
-Lascar_SN_to_ID <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Lascar_SN_to_ID.csv", stringsAsFactors = FALSE)
-Lascar_SNs <- readRDS("/Users/Adoption/Documents/GRAPHS exposure R scripts/Lascar_SN_data_2016Jan15.rds")
-Lascar_SNs$unique_ID <- paste(Lascar_SNs$lascar, Lascar_SNs$SN, sep = "_")
-
-
-# make chart of SNs
-sns <- data.frame(unique_ID = unique(Lascar_SNs$unique_ID))
-for (i in 1:nrow(sns)) {
-  sns$lascar[i] <- unique(Lascar_SNs$lascar[Lascar_SNs$unique_ID == sns$unique_ID[i]])
-  sns$SN[i] <- unique(Lascar_SNs$SN[Lascar_SNs$unique_ID == sns$unique_ID[i]])
-}
-
-# make long format
-oldSNs <- melt(Lascar_SN_to_ID, id.vars = "SN", measure.vars = c("lascar1", "lascar2", "lascar3"))
-oldSNs <- oldSNs[, c(1,3)]
-names(oldSNs)[2] <- "lascar"
-oldSNs <- oldSNs[,c(2,1)]
-newSNs <- rbind(oldSNs, sns[, c("lascar", "SN")])
-newSNs <- newSNs[!duplicated(newSNs),]
-
-# make Lascar IDs consistent
-length(unique(newSNs$lascar))
-newSNs$lascar <- gsub("C0", "CO", newSNs$lascar)
-newSNs$lascar <- gsub("-", "_", newSNs$lascar)
-newSNs$lascar <- gsub("\\.", "_", newSNs$lascar)
-newSNs <- newSNs[!duplicated(newSNs),]
-
-
-calib <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factor_allJan13.csv", stringsAsFactors = FALSE)
-
-calib$lascar <- gsub("C0", "CO", calib$lascar)
-calib$lascar <- gsub("-", "_", calib$lascar)
-calib$lascar <- gsub("\\.", "_", calib$lascar)
-
-calib <- merge(calib, newSNs, by = "lascar", all.x = TRUE) # this adds 6 more rows... because some files are associated with more than one SN/lascar combo?
-
-nrow(calib) #284
-length(unique(calib$SN)) #268
-
-# which SNs have more than one row?
-duplicates <- unique(calib$SN[duplicated(calib$SN)])
-dups <- calib[calib$SN %in% duplicates,]
-dups[order(dups$SN),]
-dups$lascar[is.na(dups$SN)] # 7 lascars have no SN?
-#[1] "CU_CO_253" "CU_CO_257" "CU_CO_259" "CU_CO_268" "CU_CO_274" "CU_CO_276" "CU_CO_283"
-# THESE HAVE BEEN CALIBRATED BUT ARE NOT ASSOCIATED WITH ANY NEW DATA FILES IN THE DROPBOX
-
-
-no_sn <- dups[is.na(dups$SN),]
-
-# the rest of them that do have SNs
-dups <- dups[,3:ncol(dups)]
-dups[dups$SN == 12135 &!is.na(dups$SN),]
-
-flat <- aggregate(x=dups[,1:62], by=list(name=dups$SN), FUN = mean, na.rm = TRUE)
-
-# function to replace NaN with NA
-NaN2NA <- function(x) {
-  z <- gsub("\\s+", NaN, x)  # "\\s+" means match all
-  x[z == NaN] <- NA 
-  return(x)
-}
-
-flat2 <- as.data.frame(lapply(X = flat[, 2:ncol(flat)], FUN = NaN2NA))
-flat <- cbind(flat[,1], flat2)
-names(flat)[1] <- "SN"
-
-flat <- flat[,c(2:ncol(flat), 1)]
-flat$lascar <- "multiple"
-flat$X <- NA
-flat <- flat[, c(64:65, 1:63)]
-
-# bind them together
-
-calib <- calib[!calib$SN %in% duplicates,]
-calib <- rbind(calib, flat)
-calib <- rbind(calib, no_sn)
-
-saveRDS(calib, file = paste0("calib_factor_all_", format(Sys.Date(), format = "%Y%b$d"), ".rds"))
-
-# calculate means
-
+############ SECTION 4: calculate means & means excluding 0 ##########
+calib <- calib_factor_all
 factor_variables <- regmatches(names(calib), regexpr("factor_.*", names(calib)))
 
 calib_factors <- calib[,colnames(calib) %in% c("lascar", "SN", factor_variables)]
-calib_factors$mean <- NA
-calib_factors$sd <- NA
-calib_factors$calibrations <- NA
-calib_factors$mean_excl_0 <- NA
 
-calib_factors$mean <- rowMeans(calib_factors[,2:(ncol(calib_factors)-5)], na.rm = TRUE)
-calib_factors$calibrations <- rowSums(!is.na(calib_factors[,2:(ncol(calib_factors)-5)]))
-
+calib_factors$mean <- rowMeans(calib_factors[,3:(ncol(calib_factors))], na.rm = TRUE)
+calib_factors$calibrations <- rowSums(!is.na(calib_factors[,3:(ncol(calib_factors)-1)]))
 for (i in 1:nrow(calib_factors)) {
-calib_factors$sd[i] <- sd(calib_factors[i,2:(ncol(calib_factors)-5)], na.rm = TRUE)
+  calib_factors$sd[i] <- sd(calib_factors[i,3:(ncol(calib_factors)-3)], na.rm = TRUE)
 }
 
 for (i in 1:nrow(calib_factors)) {
-  tempdata <- as.numeric(calib_factors[i, 2:(ncol(calib_factors) - 5)])
+  tempdata <- as.numeric(calib_factors[i, 3:(ncol(calib_factors) - 3)])
   tempdata <- tempdata[!tempdata == 0]
   calib_factors$mean_excl_0[i] <- mean(tempdata, na.rm = TRUE)
   }
@@ -401,72 +271,17 @@ for (i in 1:nrow(calib_factors)) {
 # 
 calib_factors_ordered <- calib_factors[order(calib_factors$lascar),]
 saveRDS(calib_factors_ordered, file = paste0("calib_factors_ordered_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
-# 
 
-# # Need to start with a  CO_stacked files file.
-# 
-# files <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/12Dec2014/CO_stacked files/")
-# length(files)
-# 
-# SN_data <- as.data.frame(files)
-# SN_data$SN <- regmatches(SN_data[,1], regexpr("_\\d+\\.", SN_data[,1]))
-# SN_data$SN <- substr(SN_data$SN, 2, nchar(SN_data$SN)-1)
-# 
-# lascar_pattern <- "(CO.USB....|COL.USB....|CU.CO....)"
-# SN_data$lascar <- regmatches(SN_data$files, regexpr(lascar_pattern, SN_data$files))
-# SN_data$lascar <- ifelse(substr(SN_data$lascar, start = nchar(SN_data$lascar), stop = nchar(SN_data$lascar)) == "_", substr(SN_data$lascar, 1, nchar(SN_data$lascar)-1),SN_data$lascar)
-# 
-# #208 files, 171 unique SNs, 206 unique lascars....
-# test_table <- data.frame(SN = unique(SN_data$SN))
-# for (i in 1:nrow(test_table)) {
-#   test_table$no_lascars[i] <- length(SN_data$lascar[SN_data$SN == test_table$SN[i]])
-# }
-# test_table$lascar1 <- NA
-# test_table$lascar2 <- NA
-# test_table$lascar3 <- NA
-# for (i in 1:nrow(test_table)) {
-#   test_table$lascar1[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][1]
-#   test_table$lascar2[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][2]
-#   test_table$lascar3[i] <- SN_data$lascar[SN_data$SN == test_table$SN[i]][3]
-# }
-# 
-# Lascar_SN_to_ID <- test_table
-# write.csv(Lascar_SN_to_ID, file = "Lascar_SN_to_ID.csv", row.names = FALSE)
-# 
-# ######### skip to here
-# 
-# Lascar_SN_to_ID <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Lascar_SN_to_ID.csv", stringsAsFactors = FALSE)
-# 
-# test <- calib_factors_ordered
-# test$SN <- NA
-# for (i in 1:nrow(test)) {
-#   test$SN[i] <- ifelse(test$lascar[i] %in% Lascar_SN_to_ID$lascar1, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar1 == test$lascar[i]]), test$SN[i])
-#   test$SN[i] <- ifelse(is.na(test$SN[i]) & test$lascar[i] %in% Lascar_SN_to_ID$lascar2, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar2 == test$lascar[i] & !is.na(Lascar_SN_to_ID$lascar2)]), test$SN[i])
-#   test$SN[i] <- ifelse(is.na(test$SN[i]) & test$lascar[i] %in% Lascar_SN_to_ID$lascar3, as.character(Lascar_SN_to_ID$SN[Lascar_SN_to_ID$lascar3 == test$lascar[i] & !is.na(Lascar_SN_to_ID$lascar3)]), test$SN[i])
-# }
-# 
-# names(test)[2:14] <- paste0("2014", substr(names(test)[2:14],8,12))
-# names(test)[15:32] <- substr(names(test)[15:32],8,nchar(names(test)[15:32]))
-# 
-# 
-# calib_factors_ordered <- test
-# 
-# write.csv(calib_factors_ordered, file = paste0("calib_factors_ordered_", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
-# 
-# calib_factors_ordered_old <- read.csv("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/calib_factors_ordered_Dec16.csv", stringsAsFactors = FALSE)
-# 
-# 
-# 
-######################
-# Plots ----------
-######################
+
+########## Section 5: Make Plots of each Lascar's measured CFs over time ##############
+
 # Merge by SN:
-calib_long <- melt(calib_factors_ordered[,c(1:33)], id.vars  = c("SN", "lascar"))
-
-# Plots: each lascar's calibration factors
+calib_long <- melt(calib_factors_ordered[,c(1:33)], id.vars  = c("SN", "lascar")) # not sure why this is 1:33
 
 calib_long <- arrange(calib_long, SN)
 
+
+# Save plots of each lascar's calibration factors
 pdf(file = paste0("Lascar_Calibrations_Each_", format(Sys.Date(), format = "%Y%b%d"), ".pdf"), width = 10, height = 7)
 par(mfrow = c(3,3))
 has_sn <- unique(calib_long$SN[!is.na(calib_long$SN)])
@@ -499,16 +314,14 @@ text(x = unique(calib_long$variable), y = 1.75, labels= paste0("n=\n",dates$lasc
 dev.off()
 
 
-#############
-### Calibration factors by interpolation ----------
-#############
+
+### SECTION 6: ASSIGN MONTHLY CORRECTION FACTORS BY INTERPOLATION ######### 
 
 
-
-# calculate mean
-mean(calib_long$value[!is.na(calib_long$value)]) # 0.76 / 2016Jan15: 0.67
-mean(calib_long$value[calib_long$value >= 0.6 & calib_long$value <= 1.2 & !is.na(calib_long$value)]) # 0.85 / 2016Jan15: 0.82
-
+# calculate/set mean
+# mean(calib_long$value[!is.na(calib_long$value)]) # 0.76 / 2016Jan15: 0.67
+# mean(calib_long$value[calib_long$value >= 0.6 & calib_long$value <= 1.2 & !is.na(calib_long$value)]) # 0.85 / 2016Jan15: 0.82
+mean <- 0.85 # (this was the mean in 2014)
 
 # calculate monthly averages
 has_sn <-  unique(calib_long$SN[!is.na(calib_long$SN)])
@@ -563,61 +376,70 @@ for (i in 1:length(no_sn)) {
 
 
 
-##### STOPPED HERE --------
 
-# Merge with previous monthlycfs (do I need to do this? NO)
+
+# # set up a new data frame for the monthly averaged CFs
+cf <- data.frame(SN = monthlycfs$SN, lascar = monthlycfs$lascar)
+cf[,3:29] <- NA # this range may need adjusting
+
+# This section will have to be adjusted for the pertinent dates - you want to have one column for each month of data collection
+
+colnames(cf)[3:5] <- paste0(c("October", "November", "December"), "_2013")
+colnames(cf)[6:17] <- paste0(c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"), "_2014")
+colnames(cf)[18:22] <- paste0(c("January", "February", "March", "April", "May"), "_2015")
+
+
+cfs <- merge(cf, monthlycfs, all.y = TRUE)
+
+# sort them chronologically, there may be an easier way to do this?
+cfs <- cfs[,c(1:2, 9:12, 3:4, 13:14, 5:6,15:17,7:8,18:22)]
+
+# save
+saveRDS(cfs, file = paste0("calib_factors_bymonth_", format(Sys.Date(), format = "%Y%b%d"), ".rds")) # monthly averaged CFs (not interpolated)
+
+#### Section 7: WORK WITH THIS SECTION IF ADDING ON TO A PREVIOUS FILE ######
 # cfs_old <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # the factors go through Dec 2014, the old Dec 2014 is MORE COMPLETE than the new Dec 2014 so use the old one
 # cfs_old <- cfs_old[, 1:17] # thru Dec 2014, already ordered
 
 
-# monthlycfs <- monthlycfs[,2:13]
-# order columns
-names(monthlycfs)[1:11] <- paste(substr(names(monthlycfs)[1:11], nchar(names(monthlycfs)[1:11]) - 3, nchar(names(monthlycfs)[1:11])), substr(names(monthlycfs)[1:11], 1, nchar(names(monthlycfs)[1:11]) - 5), "01", sep = "")
-
-# fill in missing months
-monthlycfs[,14:26] <- NA
-names(monthlycfs)[14:26] <- c("2014April01", "2014May01", "2014August01", "2014September01", "2014October01", "2015March01", "2015April01", "2015May01", "2015July01", "2015August01", "2015September01", "2015October01", "2015December01")
-
-monthlycfs <- monthlycfs[, c(12:13, 1:11, 14:26)]
-
-idcol <- monthlycfs[,1:2]
-therest <- monthlycfs[, 3:ncol(monthlycfs)]
-therest <- therest[,order(ymd(names(therest)))]
-
-monthlycfs2 <- cbind(idcol, therest)
-
-
-names(monthlycfs2)[3:ncol(monthlycfs2)] <- substr(names(monthlycfs2)[3:ncol(monthlycfs2)], 1, nchar(names(monthlycfs2)[3:ncol(monthlycfs2)]) - 2)
-
-# add Oct - Dec 2013
-monthlycfs2[, 27:29] <- NA
-names(monthlycfs2)[27:29] <- c("2013October", "2013November", "2013December")
-monthlycfs2 <- monthlycfs2[, c(1:2, 27:29, 3:26)]
-
-# # set up a new data frame for the monthly averaged CFs
-# cf <- data.frame(SN = monthlycfs$SN, lascar = monthlycfs$lascar)
-# cf[,3:29] <- NA
-# colnames(cf)[3:5] <- paste0(c("October", "November", "December"), "_2013")
-# colnames(cf)[6:17] <- paste0(c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"), "_2014")
-# colnames(cf)[18:22] <- paste0(c("January", "February", "March", "April", "May"), "_2015")
+# # monthlycfs <- monthlycfs[,2:13]
+# # order columns
+# names(monthlycfs)[1:11] <- paste(substr(names(monthlycfs)[1:11], nchar(names(monthlycfs)[1:11]) - 3, nchar(names(monthlycfs)[1:11])), substr(names(monthlycfs)[1:11], 1, nchar(names(monthlycfs)[1:11]) - 5), "01", sep = "")
+# 
+# # fill in missing months
+# monthlycfs[,14:26] <- NA
+# names(monthlycfs)[14:26] <- c("2014April01", "2014May01", "2014August01", "2014September01", "2014October01", "2015March01", "2015April01", "2015May01", "2015July01", "2015August01", "2015September01", "2015October01", "2015December01")
+# 
+# monthlycfs <- monthlycfs[, c(12:13, 1:11, 14:26)]
+# 
+# idcol <- monthlycfs[,1:2]
+# therest <- monthlycfs[, 3:ncol(monthlycfs)]
+# therest <- therest[,order(ymd(names(therest)))]
+# 
+# monthlycfs2 <- cbind(idcol, therest)
 # 
 # 
-# cfs <- merge(cf, monthlycfs, all.y = TRUE)
-# cfs <- cfs[,c(1:2, 9:12, 3:4, 13:14, 5:6,15:17,7:8,18:22)]
+# names(monthlycfs2)[3:ncol(monthlycfs2)] <- substr(names(monthlycfs2)[3:ncol(monthlycfs2)], 1, nchar(names(monthlycfs2)[3:ncol(monthlycfs2)]) - 2)
+# 
+# # add Oct - Dec 2013
+# monthlycfs2[, 27:29] <- NA
+# names(monthlycfs2)[27:29] <- c("2013October", "2013November", "2013December")
+# monthlycfs2 <- monthlycfs2[, c(1:2, 27:29, 3:26)]
+# 
+# saveRDS(monthlycfs2, file = paste0("calib_factors_bymonth_", format(Sys.Date(), format = "%Y%b%d"), ".rds")) # monthly averaged CFs (not interpolated)
 
 
-saveRDS(monthlycfs2, file = paste0("calib_factors_bymonth_", format(Sys.Date(), format = "%Y%b%d"), ".rds")) # monthly averaged CFs (not interpolated)
 
-
-#### INTERPOLATE -------
+#### SECTION 8: INTERPOLATE #############
 # NEW - if calib hasn't been done in 8 months, tail of data coral
+# load file of monthly CFs
 cfs <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_2016Jan16.rds")
 cf_new <- cfs
-cf_new[,30:56] <- NA
+cf_new[,30:56] <- NA # this range will need to be adjusted
 conf_names <- paste0(names(cf_new[,3:29]), "_conf")
 for (i in 30:56) { colnames(cf_new)[i] <- conf_names[i-29] }
 
-# plot:
+# make and save plot of interpolated CFs, add interpolated CFs to cf_new
 pdf(file = paste0("Calib_factors_bymonth_interp_", format(Sys.Date(), format = "%Y%b%d"), ".pdf"), height = 10, width = 10)
 par(mfrow = c(3,3))
 for (i in 1:nrow(cfs)) {
@@ -626,7 +448,6 @@ for (i in 1:nrow(cfs)) {
   
   #### assigning initial values as the initial measured value
   yax[1] <- cfs[i,which(!is.na(cfs[i,3:ncol(cfs)]))[1]+2]
-  
   
   plot(xax,yax, pch = 16, col = "red",ylim = c(0,2), main = paste0(cfs$SN[i], " \n", cfs$lascar[i]), ylab = "Calibration Factor", xlab = "", xaxt = "n", cex.main = 0.95)
   
@@ -659,7 +480,6 @@ for (i in 1:nrow(cfs)) {
   # apply grey color and no confidence to any points with CF < 0.2
   allpoints$colors <- ifelse(allpoints$interp_complete < 0.2, "grey", allpoints$colors)
   
-  
   # apply coral color and lo confidence to tail of data if it has been more than 8 months since lascar last calibrated and previous calibration was green
   # last caliberation
   last <- nrow(allpoints) - which(!is.na(yax[ncol(yax):1]))[1] + 1 # counting backwards 8 months from last column
@@ -672,8 +492,6 @@ for (i in 1:nrow(cfs)) {
   # map colors to confidence levels
   allpoints$conf <- mapvalues(allpoints$colors, from = c("lightgreen", "coral","grey"), to = c("hi", "lo", "none"), warn_missing = FALSE)
   
-  
-  
   ### add back in the actual measured monthly averages in black
   points(xax[2:length(xax)], yax[2:length(yax)], pch = 16, col = "black") # plots all non-NA values of yax
   
@@ -681,9 +499,7 @@ for (i in 1:nrow(cfs)) {
   points(xax[1], yax[1], pch = 16, col = "red")
   abline(h=0.6, lty = "dotted", col = "darkgrey")
   abline(h = 1.2, lty = "dotted", col = "darkgrey")
-  
-  
-  
+
   ### add x axis and legend
   xlabels <-names(cfs)[3:ncol(cfs)]
   axis(side = 1, at = xax, labels = substr(xlabels, 1, 7), las = 2, cex.axis = 0.9)
@@ -694,16 +510,16 @@ for (i in 1:nrow(cfs)) {
   cf_new[i, 3:29] <- round(allpoints$interp_complete, digits = 3)
   cf_new[i, 30:56] <- allpoints$conf
 }
-dev.off()
+dev.off() # end plot and interpolation
 
 
-## save the interpolated CF factors 
+######### save the interpolated CF factors #########
 saveRDS(cf_new, file = paste0("calib_factors_bymonth_interp_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
 
+# the above file will be used with "Lascar_batch_processing_bySN.R"
 
 
 
-
-
+####### THE END
 
 
