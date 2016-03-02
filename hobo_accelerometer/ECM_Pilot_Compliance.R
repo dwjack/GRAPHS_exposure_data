@@ -301,6 +301,7 @@ pcts <- mutate(pcts, more40_pct = more40/n*100, more60_pct = more60/n*100, more8
 # overall
 summary(hours_summary)
 
+# Figure 3 in ECM paper --------------------
 # bar chart
 library(reshape2)
 bar_data <- melt(hours_summary[, c("studyid", "age", "unit_type", "hours_worn")], id.vars = c("studyid", "unit_type", "age"))

@@ -2,7 +2,7 @@
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-
+library(scales)
 library(gridExtra)
 
 # Add arm information -------
@@ -47,9 +47,9 @@ t.test(co_mean_corr ~ arm2, data = post[post$arm2 %in% c("lpg", "biolite"),]) #*
 # pre & post-intervention boxplots
 pdf(file = "CO_pre_post.pdf", width = 10, height = 8, bg = "white")
 par(mfrow = c(1,2))
-p1 <- ggplot(pre, aes(factor(arm2, levels = c("control", "biolite", "lpg")), co_mean_corr, fill = "red")) + geom_boxplot() + guides(fill = FALSE) + coord_cartesian(ylim = c(0,20)) + ggtitle("Pre-Intervention CO") + xlab(label = "") + ylab("CO (ppm)") + theme_bw()
+p1 <- ggplot(pre, aes(factor(arm2, levels = c("control", "biolite", "lpg")), co_mean_corr, fill = "red")) + geom_boxplot() + guides(fill = FALSE) + coord_cartesian(ylim = c(0,20)) + ggtitle("Pre-Intervention CO") + xlab(label = "") + ylab("CO (ppm)") + theme_bw() + coord_trans(ytrans = "log10") + scale_y_continuous(breaks = c(1,5,10, 15), labels = c(1,5,10,15))
 
-p2 <- ggplot(post, aes(factor(arm2, levels = c("control", "biolite", "lpg")), co_mean_corr, fill = "blue")) + geom_boxplot() + guides(fill = FALSE) + coord_cartesian(ylim = c(0,20)) + ggtitle("Post-Intervention CO") + xlab(label = "") + ylab("CO (ppm)") + theme_bw()
+p2 <- ggplot(post, aes(factor(arm2, levels = c("control", "biolite", "lpg")), co_mean_corr, fill = "blue")) + geom_boxplot() + guides(fill = FALSE)  + ggtitle("Post-Intervention CO") + xlab(label = "") + ylab("CO (ppm)") + theme_bw() + coord_trans(ytrans = "log10") + scale_y_continuous(breaks = c(1,5,10, 15), labels = c(1,5,10,15))
 df1 <- data.frame(a = c(1, 1,3, 3), b = c(18,19,19,18))
 df2 <- data.frame(a = c(1.1,1.1,1.9,1.9), b = c(16,17,17,16))
 df3 <- data.frame(a = c(2.1,2.1,2.9,2.9), b = c(13,14,14,13))
@@ -89,7 +89,7 @@ t.test(percent_change ~ arm2, data = wide[wide$arm2 %in% c("lpg", "biolite"),]) 
 # pre & post-intervention boxplots
 # change in PPM
 pdf(file = "CO_change_pre_post_ppm.pdf", width = 10, height = 8, bg = "white")
-p1 <- ggplot(wide, aes(factor(arm2, levels = c("control", "biolite", "lpg")), change, fill = "red")) + geom_boxplot() + guides(fill = FALSE)  + coord_cartesian(ylim = c(-10,10)) + ggtitle("Change in personal CO Exposure") + xlab(label = "") + ylab("Change in CO after intervention (ppm)") + theme_bw()
+p1 <- ggplot(wide, aes(factor(arm2, levels = c("control", "biolite", "lpg")), change, fill = "red")) + geom_boxplot() + guides(fill = FALSE)  + coord_cartesian(ylim = c(-10,12)) + ggtitle("Change in personal CO Exposure") + xlab(label = "") + ylab("Change in CO after intervention (ppm)") + theme_bw()
 df1 <- data.frame(a = c(1, 1,3, 3), b = c(9,10,10,9))
 df2 <- data.frame(a = c(1.1,1.1,1.9,1.9), b = c(8,9,9,8))
 df3 <- data.frame(a = c(2.1,2.1,2.9,2.9), b = c(7,8,8,7))
