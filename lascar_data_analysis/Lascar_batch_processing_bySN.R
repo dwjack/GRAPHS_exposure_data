@@ -4,11 +4,6 @@
 # then load files in groups by SN and process and save the data in batches by SN. Apply calibration factors when available. Plot the data in the same batches. (THIS STEP TAKES A LONG TIME)
 # Generate overall parameters for the processed files
 # Generate forms to use in validation.
-# Merge the manual validation info back into the overall parameters.
-
-
-
-### SECTION 0: LOAD PACKAGES, FILES, and FUNCTIONS #######
 
 require(lubridate)
 require(plyr)
@@ -17,110 +12,21 @@ require(ggplot2)
 require(scales)
 require(reshape2)
 
-
-# NOTE: path depends on computer: some dropboxes referred to as ~/Dropbox/Ghana_exposure_data_SHARED_2014 and some as ~/Dropbox/Ghana_exposure_data_SHARED_2014, do find/replace
-
-
-######### Load necessary files
-# Need calibration factor info (see "lascar_calibration_Jan2016.R")
-# NOTE: you could temporarily process files with the mean cf and 'hi' cf confidence if there is no cf_new file, see section 1e.
-
-cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Jan31.rds")
-
-######## Load necessary functions
-
-# function to convert blanks to NA 
-blank2na <- function(x){ 
-  z <- gsub("\\s+", "", x)  #make sure it's "" and not " " etc
-  x[z==""] <- NA 
-  return(x)
-}
-
-# get.info function to pull out the SN
-get.info <- function(x) { ####### read in first row of each data file and extract pertinent info
-  
-  possibleError <- tryCatch(
-    dt <- read.csv(x, stringsAsFactors=F, header=T, nrows = 1)[,1:5],
-    error = function(e) e
-  )
-  if(!inherits(possibleError, "error")) {
-    
-    dt$file2 <- basename(x)
-    dt$lascar_infile <- names(dt)[1]
-    dt$lascar_infile <- gsub("C0", "CO", dt$lascar)
-    dt$lascar_infile <- gsub("-", "_", dt$lascar)
-    dt$SN<- dt$Serial.Number
-    dt$datetime <- dmy_hms(dt$Time, tz="GMT")
-    dt$monthyear <- paste(months(dt$datetime), year(dt$datetime), sep = "_")
-    dt$firstline <- paste(dt[,2:5], collapse = "/")
-    dt <- dt[, c("file2", "SN", "lascar_infile", "monthyear", "firstline")]
-    dt
-  }
-}
-
-# Lascar.import function to calculate minutewise CO data 
-lascar.import <- function(file,cf, cf_conf) { 
-  dt <- read.csv(file, stringsAsFactors=F, header=T)[,1:5]
-  dt$lascar <- names(dt)[1]
-  dt$lascar <- gsub("C0", "CO", dt$lascar)
-  dt$lascar <- gsub("-", "_", dt$lascar)
-  dt$SN<- dt$Serial.Number[1]
-  dt$datetime <- dmy_hms(dt$Time, tz="GMT")
-  dt$rd.datetime <- as.character(round(dt$datetime, 'min'))
-  dt<-dt %>% group_by(rd.datetime) %>% dplyr::summarise(mean(CO.ppm.), lascar[1], SN[1])
-  names(dt) <- c('datetime','co', 'lascar', 'SN')
-  dt$datetime <- ymd_hms(dt$datetime)
-  dt$cf <- cf
-  dt$cf_conf <- ifelse(!is.na(dt$cf[1]), cf_conf, "lo") # if CF is NA, set as low
-  cfgood <- !is.na(dt$cf[1]) & dt$cf[1] >=0.2
-  if(cfgood == TRUE) dt$co_corr <- dt$co/dt$cf
-  if(cfgood == FALSE) dt$co_corr <- dt$co/0.85 # if CF is NA or < 0.2,  adjust with the mean
-  dt
-}
-
-# CO.parameters function to calculate overall session parameters from processed files
-CO.parameters <- function(x) { 
-  CO_stacked_bySN <- readRDS(x)
-  data <- CO_stacked_bySN %>% 
-    group_by(file) %>% 
-    summarise(mstudyid = mstudyid[1], 
-              cstudyid = cstudyid[1], 
-              session = session[1], 
-              lascar = lascar[1], 
-              sn = SN[1],  
-              firstdate = datetime[1], 
-              lastdate = datetime[n()], 
-              co_mean = mean(co, na.rm = TRUE), 
-              co_sd = sd(co, na.rm = TRUE), 
-              co_q90 = quantile(co, probs = 0.9, na.rm = TRUE), 
-              co_q98 = quantile(co, probs = 0.98, na.rm = TRUE), 
-              co_cf = cf[1], 
-              co_cf_conf = cf_conf[1], 
-              co_mean_corr = mean(co_corr, na.rm = TRUE), 
-              co_sd_corr = sd(co_corr, na.rm = TRUE), 
-              co_q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), 
-              co_q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE), 
-              
-              co_day1_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 24, mean(co_corr[datetime < datetime[1] + hours(24)], na.rm = TRUE), NA), 
-              co_day2_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 48, mean(co_corr[datetime >= datetime[1] + hours(24) & datetime < datetime[1] + hours(48)], na.rm = TRUE), NA), 
-              co_day3_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 72, mean(co_corr[datetime >= datetime[1] + hours(48) & datetime < datetime[1] + hours(72)], na.rm = TRUE), NA), 
-              co_mean_first48_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 48, mean(co_corr[datetime < datetime[1] + hours(48)], na.rm = TRUE), NA),  
-              co_mean_first72_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 72, mean(co_corr[datetime < datetime[1] + hours(72)], na.rm = TRUE), NA),
-              co_hours = as.numeric(round(difftime(datetime[n()], datetime[1], units = "hours"), digits = 1)))
-  data
-}
+#########
+# note some dropboxes referred to as ~/Dropbox/Ghana_exposure_data_SHARED_2014 and some as ~/Dropbox/Ghana_exposure_data_SHARED_2014, do find/replace
+##########
 
 
-############################ SECTION 1: GETTING INFO FROM RAW LASCAR FILES #####################
+#####################
+# To load data from original Lascar .csv files
+#####################
 
-########## Section 1a: Make a list of the Lascar .csv files you want to process ###########
+
 #create vectors of all file names  -----
 files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=T) 
 length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818
 
-############### Section 1b: Subsetting the unvalidated files --- OPTIONAL #######
-# If this is a later batch and you only want to work from  previously unvalidated files (rather than all the existing files), load the "unvalidated" file --- see SECTION 7. Otherwise, skip to Section 1c. 
-
+# Only include previously unvalidated files 
 unvalidated <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_parameters_unvalidated_4734sessions_Jan30.rds")
 
 nrow(unvalidated) # 4734
@@ -131,10 +37,7 @@ sum(duplicated(basename(files))) # should be 0? but is 9...
 files <- files[!duplicated(basename(files))]
 length(files) # 4726
 
-######## END OPTIONAL Section 1b ########
-
-
-############ Section 1c: make a data frame of the desired files ##############
+# make a data frame of the files
 Lascar_data <- data.frame(file = files, stringsAsFactors = FALSE)
 Lascar_data$file2 <- basename(files)
 
@@ -157,7 +60,28 @@ Lascar_data$lascar <- ifelse(substr(Lascar_data$lascar, start = nchar(Lascar_dat
 
 length(unique(Lascar_data$lascar)) 
 
-############## Section 1d: load data to get SNs #################
+# load data to get SNs ----
+
+get.info <- function(x) { ####### read in first row of each data file and extract pertinent info
+  
+  possibleError <- tryCatch(
+  dt <- read.csv(x, stringsAsFactors=F, header=T, nrows = 1)[,1:5],
+  error = function(e) e
+  )
+  if(!inherits(possibleError, "error")) {
+  
+  dt$file2 <- basename(x)
+  dt$lascar_infile <- names(dt)[1]
+  dt$lascar_infile <- gsub("C0", "CO", dt$lascar)
+  dt$lascar_infile <- gsub("-", "_", dt$lascar)
+  dt$SN<- dt$Serial.Number
+  dt$datetime <- dmy_hms(dt$Time, tz="GMT")
+  dt$monthyear <- paste(months(dt$datetime), year(dt$datetime), sep = "_")
+  dt$firstline <- paste(dt[,2:5], collapse = "/")
+  dt <- dt[, c("file2", "SN", "lascar_infile", "monthyear", "firstline")]
+  dt
+  }
+}
 
 file_data <- ldply(files, get.info, .progress = "text")
 
@@ -171,16 +95,11 @@ nrow(Lascar_data) #6623/ Jan 29 7152/ Jan 15, 2016 5041/ Feb 1 4726
 
 saveRDS(Lascar_data, file = paste0("Lascar_SN_data_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
 
-
-############ Section 1e: match the Calibration Factor (pulls the CF from the month of the last day of monitoring) - see "lascar_calibration_Jan2016.R"
+# match the CF (pulls the CF from the month of the last day of monitoring) - see "lascar_calibration_Jan2016.R"
+cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Jan31.rds")
 
 Lascar_data$monthyear <- paste0(substr(Lascar_data$monthyear, nchar(Lascar_data$monthyear)-3, nchar(Lascar_data$monthyear)), substr(Lascar_data$monthyear, 1, nchar(Lascar_data$monthyear) - 5))
 
-##### IF there is no cf_new file, just assign the mean cf and hi confidence: ######
-Lascar_data$cf <- 0.85
-Lascar_data$cf_conf <- "hi"
-
-##### BUT IDEALLY you should set the CF from a cf_new file by running the below:
 Lascar_data$cf <- NA
 Lascar_data$cf_conf <- NA
 for (i in 1:nrow(Lascar_data)){
@@ -190,10 +109,6 @@ for (i in 1:nrow(Lascar_data)){
 }
 Lascar_data$cf <- as.numeric(Lascar_data$cf)
 
-
-
-
-
 # get rid of files called "dropbox.attributes"
 dropbox_pattern <- "dropbox.attributes"
 Lascar_data <- Lascar_data[regexpr(dropbox_pattern, Lascar_data$file) == -1,]
@@ -201,34 +116,50 @@ Lascar_data <- Lascar_data[regexpr(dropbox_pattern, Lascar_data$file) == -1,]
 summary(Lascar_data) # 66 NAs for cf
 length(unique(Lascar_data$SN[is.na(Lascar_data$cf)])) # 7 unique Lascars have no calib info
 
-# Section 1f: save Lascar_data
+# save Lascar_data
 saveRDS(Lascar_data, file = paste0("Lascar_data_cf_", format(Sys.Date(), format = "%Y%b%d"), ".rds" ))
 
 
 
-####### SECTION 2: IMPORT AND PROCESS THE DATA BY SN ##############
+
+#### OK TO HERE #####
+
+# Lascar.import function -------
+lascar.import <- function(file,cf, cf_conf) { 
+  dt <- read.csv(file, stringsAsFactors=F, header=T)[,1:5]
+  dt$lascar <- names(dt)[1]
+  dt$lascar <- gsub("C0", "CO", dt$lascar)
+  dt$lascar <- gsub("-", "_", dt$lascar)
+  dt$SN<- dt$Serial.Number[1]
+  dt$datetime <- dmy_hms(dt$Time, tz="GMT")
+  dt$rd.datetime <- as.character(round(dt$datetime, 'min'))
+  dt<-dt %>% group_by(rd.datetime) %>% dplyr::summarise(mean(CO.ppm.), lascar[1], SN[1])
+  names(dt) <- c('datetime','co', 'lascar', 'SN')
+  dt$datetime <- ymd_hms(dt$datetime)
+  dt$cf <- cf
+  dt$cf_conf <- ifelse(!is.na(dt$cf[1]), cf_conf, "lo") # if CF is NA, set as low
+  cfgood <- !is.na(dt$cf[1]) & dt$cf[1] >=0.2
+  if(cfgood == TRUE) dt$co_corr <- dt$co/dt$cf
+  if(cfgood == FALSE) dt$co_corr <- dt$co/0.85 # if CF is NA or < 0.2,  adjust with the mean
+  dt
+}
+
 
 #################### START LOOP HERE if working from raw Lascar files ###################
 # If working from raw files be sure to comment out section at "START HERE IF WORKING FROM SAVED .RDS DATA
 ## NOTE: THE FOLLOWING STEPS FROM THE RAW DATA TAKE A LONG TIME!
 
-# load the Lascar data (from file saved in Section 1) and set directory locations to save the processed data and plots ######
 Lascar_data <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_documents/Calibration Factors/Datasets/Lascar_data_cf_2016Feb01.rds")
 
-# set a directory for the saved data. 
+##################################
+# set a directory for the saved data. Also scroll down for the plot directory.
 directory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Feb01/CO_stacked_files/"
+##################################
 
-# set a directory for the saved plots 
-plotdirectory <- "~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Feb01/Plots by SN/"
-
-# set a meanCF to use for plots that have no CF
-meancf <- 0.85 #(mean across all units' CFs that were between 0.6 and 1.2 between Feb and Dec 2014)
-
-########## Process the data
 
 ptm <- proc.time()
 
-for (i in 1:length(unique(Lascar_data$SN))) { 
+for (i in 1:length(unique(Lascar_data$SN))) { #1:length(unique(Lascar_data$SN)))
   files_bySN <- Lascar_data[Lascar_data$SN == unique(Lascar_data$SN)[i], c("file", "cf", "cf_conf")]
   
   CO_stacked <- mdply(files_bySN, lascar.import, .progress = "text") # mdply so can supply multiple arguments to lascar.import. Variable names of files_bySN must match those in lascar.import (file, cf, cf_conf)
@@ -257,13 +188,13 @@ for (i in 1:length(unique(Lascar_data$SN))) {
   CO_stacked$lascar <- gsub("\\.", "_", CO_stacked$lascar)
   
  
-    # separate and save the data by SN, to the directory set above
+    # separate and save the data by SN
     saveRDS(CO_stacked, file = paste0(directory, "CO_stacked_", CO_stacked$lascar[1], "_", CO_stacked$SN[1],".rds"))
     
     
     
     ########################## START HERE IF WORKING FROM SAVED .RDS DATA ######################
-    #     #  If working from saved .rds data and ONLY redoing the plots, START HERE and run this section thru first print(i), otherwise comment it out along with the print(i) before the loop closure------
+    #     #  If working from saved .rds data START HERE and run this section thru first print[i], otherwise comment it out along with the print[i] before the loop closure------
     #     
     #     
     # savedfiles <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/CO_stacked files/", full.names = TRUE)
@@ -272,12 +203,19 @@ for (i in 1:length(unique(Lascar_data$SN))) {
           #CO_stacked <- readRDS(savedfiles[i])
       #   CO_stacked <- arrange(CO_stacked, datetime) # ascending by date
     
-
-   
+    #########################
+    
+    
+    #########################
+    # set a directory for the saved plots & a meanCF to use for plots that have no CF
+    #########################
+    plotdirectory <- "~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Feb01/Plots by SN/"
+    meancf <- 0.85 #(mean across all units' CFs that were between 0.6 and 1.2 between Feb and Dec 2014)
+    
     
     identifier <- paste("allplots", gsub("\\.", "_", CO_stacked$lascar[1]), CO_stacked$SN[1], sep = "_")
     
-    # make and save plots
+    # plot
     pdf(file = paste0(plotdirectory, identifier,".pdf"), height = 10, width = 10)
     par(mfrow = c(3,3))
     for (j in 1:length(unique(CO_stacked$file))) {
@@ -332,26 +270,56 @@ proc.time()-ptm
 
 ########################################### END plot saving ############
 
-# check how many plots were saved (should equal the number of unique Lascar SNs)
+
 allplots <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Jan16/Plots by SN", full.names = TRUE)
 length(allplots) # 174/ 264
 
+####################################################################
+### Calculating parameters for the saved data-------
+####################################################################
 
-################ SECTION 3: Calculating parameters for the saved data #############
 
-
-## Load COfiles: the desired stacked files
-
-# identify the path
-path <- "~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Feb01/CO_stacked_files/"
 # older
-
-# get the file names
-COfiles <- list.files(path,recursive=FALSE, pattern = ".rds",full.names=TRUE) 
+COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/29Jan2015/CO_stacked files/",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
 length(COfiles) #174 
 
+# new Feb01
+COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Feb01/CO_stacked_files/",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
+length(COfiles) #233
 
-# Calculate CO parameters
+
+# new adding day1, day2, day3 24-hour averages, and 72-hour average if available
+CO.parameters <- function(x) { 
+  CO_stacked_bySN <- readRDS(x)
+  data <- CO_stacked_bySN %>% 
+    group_by(file) %>% 
+    summarise(mstudyid = mstudyid[1], 
+              cstudyid = cstudyid[1], 
+              session = session[1], 
+              lascar = lascar[1], 
+              sn = SN[1],  
+              firstdate = datetime[1], 
+              lastdate = datetime[n()], 
+              co_mean = mean(co, na.rm = TRUE), 
+              co_sd = sd(co, na.rm = TRUE), 
+              co_q90 = quantile(co, probs = 0.9, na.rm = TRUE), 
+              co_q98 = quantile(co, probs = 0.98, na.rm = TRUE), 
+              co_cf = cf[1], 
+              co_cf_conf = cf_conf[1], 
+              co_mean_corr = mean(co_corr, na.rm = TRUE), 
+              co_sd_corr = sd(co_corr, na.rm = TRUE), 
+              co_q90_corr = quantile(co_corr, probs = 0.9, na.rm = TRUE), 
+              co_q98_corr = quantile(co_corr, probs = 0.98, na.rm = TRUE), 
+          
+              co_day1_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 24, mean(co_corr[datetime < datetime[1] + hours(24)], na.rm = TRUE), NA), 
+              co_day2_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 48, mean(co_corr[datetime >= datetime[1] + hours(24) & datetime < datetime[1] + hours(48)], na.rm = TRUE), NA), 
+              co_day3_mean_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 72, mean(co_corr[datetime >= datetime[1] + hours(48) & datetime < datetime[1] + hours(72)], na.rm = TRUE), NA), 
+              co_mean_first48_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 48, mean(co_corr[datetime < datetime[1] + hours(48)], na.rm = TRUE), NA),  
+              co_mean_first72_corr = ifelse(difftime(datetime[n()], datetime[1], units = "hours") >= 72, mean(co_corr[datetime < datetime[1] + hours(72)], na.rm = TRUE), NA),
+              co_hours = as.numeric(round(difftime(datetime[n()], datetime[1], units = "hours"), digits = 1)))
+  data
+}
+
 CO_parameters <- ldply(COfiles, CO.parameters, .progress = "text")
 
 CO_parameters$lascar <- gsub("\\.", "_", CO_parameters$lascar)
@@ -371,19 +339,13 @@ saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "ses
 
 
 
-######## SECTION 4: Make and save forms to fill in later for validation ######
-
-# load names of the CO_stacked files saved in Section 2 above
+######## Make forms to fill in later for validation ---------------
 savedfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Feb01/CO_stacked_files", full.names = TRUE)
 length(savedfiles)
 
-# set directory where you want to save the validation forms
 directory <- "~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016Feb01/Validation Forms 2016Feb01/"
 
-# set mean cf
 meancf <- 0.83
-
-# make and save the validation forms
 for (i in 1:length(savedfiles)){ #
   form <- data.frame()
   CO_stacked_bySN <- readRDS(savedfiles[i])
@@ -411,27 +373,22 @@ for (i in 1:length(savedfiles)){ #
     info$CO_VALID <- ""
     info$NOTES_NOTES_NOTES <- ""
     form <- rbind(form, info)
-    write.csv(form, file = paste0(directory, "ValidityForm_", form$lascar[1], "_",form$SN[1], "_",format(Sys.Date(), format = "%Y%b"), ".csv"), row.names = FALSE) # this saves a validation form
+    write.csv(form, file = paste0(directory, "ValidityForm_", form$lascar[1], "_",form$SN[1], "_",format(Sys.Date(), format = "%Y%b"), ".csv"), row.names = FALSE)
   }
   
   print(i)
 }
 
+########## STOP AND DO VISUAL VALIDATION ##############
 
-############### SECTION 5: STOP AND DO VISUAL VALIDATION ##############
+## Add validation data in to CO_parameters --------
+## The forms reviewed in the Jan 2015 folder do not have correct CFs so just merge the visual CO validity data:  co_valid, NOTES_NOTES_NOTES, and Validated.by columns
 
-# Now go through the processed plots file by file and fill in the following columns on the validation forms: co_valid, NOTES_NOTES_NOTES, and Validated.by columns. I recommend saving the completed forms to a DIFFERENT folder so they won't accidentally get overwritten if the code above gets run again.
-
-# When done with visual validation, proceed.
-
-############### SECTION 6: Add validation data back in to CO_parameters #############
-
-# load the completed validation forms
-validforms <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/Validation Forms/Reviewed Jan 2015/", full.names = TRUE)
+# load and merge CO validition forms 
+validforms <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/Validation Forms Completed_April2016_Myla/", full.names = TRUE)
 length(validforms) #171
 
-# load and merge CO validition forms - 
-import.list <- llply(validforms, read.csv) # warnings about "incomplete final lines" are ok?
+import.list <- llply(validforms, read.csv, stringsAsFactors = FALSE) # warnings about "incomplete final lines" are ok?
 CO_validation <- Reduce(function(x, y) merge(x, y, all=T), import.list, accumulate=F)
 
 # check row length
@@ -441,10 +398,43 @@ for (i in 1:length(import.list)) {
   rows <- sum(rows, a)
   rows
 }
-rows # 6623
+rows # 5037
 
 unique(CO_validation$CO_VALID) # check that only contains 1,2,3, and NA. If not, go back to forms and fix!
 
+# # merge by "file" in validation files (need to create similar variable in CO_parameters)
+# CO_parameters$file_all <- CO_parameters$file
+# CO_parameters$file <- basename(CO_parameters$file)
+
+CO_parameters <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_all_11392sessions_Jan30.rds")
+CO_parameters$year <- year(CO_parameters$firstdate)
+CO_parameters$month <- month(CO_parameters$firstdate)
+CO_parameters$day <- day(CO_parameters$firstdate)
+CO_parameters$newid <- paste(CO_parameters$lascar, CO_parameters$sn, CO_parameters$mstudyid, CO_parameters$year, CO_parameters$month, CO_parameters$day, sep = "_")
+
+
+CO_validation$year <- year(mdy_hm(CO_validation$datetime, tz = "GMT"))
+CO_validation$year <- ifelse(as.numeric(CO_validation$year < 2000), CO_validation$year + 2000, CO_validation$year)
+CO_validation$month <- month(mdy_hm(CO_validation$datetime, tz = "GMT"))
+CO_validation$day <- day(mdy_hm(CO_validation$datetime, tz = "GMT"))
+CO_validation$newid <- paste(CO_validation$lascar, CO_validation$SN, CO_validation$mstudyid, CO_validation$year, CO_validation$month, CO_validation$day, sep = "_")
+
+sum(duplicated(CO_parameters$newid)) #14
+dups <- CO_parameters$newid[duplicated(CO_parameters$newid)]
+CO_parameters[CO_parameters$newid %in% dups,c("file", "co_mean", "newid")] %>% arrange(newid)
+
+# these are all real duplicates so remove
+CO_parameters <- CO_parameters[!duplicated(CO_parameters$newid),]
+
+
+### old
+
+CO_parameters <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_unvalidated_4734sessions_Jan30.rds")
+
+
+
+# get rid of "visually_valid", "visual_notes", "validated.by" if they exist
+CO_parameters <- subset(CO_parameters, select = -c(visually_valid, visual_notes, validated.by))
 
 CO_all <- merge(CO_parameters, CO_validation[,c("file", "CO_VALID", "NOTES_NOTES_NOTES", "Validated.by")], all.x = TRUE, by = "file")
 
@@ -452,14 +442,20 @@ colnames(CO_all) <- tolower(colnames(CO_all))
 colnames(CO_all)[colnames(CO_all) == "co_valid"] <- "visually_valid"
 colnames(CO_all)[colnames(CO_all) == "notes_notes_notes"] <- "visual_notes"
 
+# function to convert blanks to NA 
+
+blank2na <- function(x){ 
+  z <- gsub("\\s+", "", x)  #make sure it's "" and not " " etc
+  x[z==""] <- NA 
+  return(x)
+}
 
 CO_all$visual_notes <- blank2na(CO_all$visual_notes)
 CO_all$validated.by <- blank2na(CO_all$validated.by)
 
+table(CO_all$visually_valid, useNA = "always")
 
-
-### Calculate duration validity
-## 1 if >=44 hours, 2 if between 18 and 44 hours, 3 if < 18 hours 
+### Calculate duration validity: 1 if >=44 hours, 2 if between 18 and 44 hours, 3 if < 18 hours -------
 CO_all$duration_valid <- ifelse(CO_all$co_hours >=44, 1, ifelse(CO_all$co_hours >=18, 2, 3))
 
 ### Calculate overall validity
@@ -479,19 +475,14 @@ unique(CO_all[!is.na(CO_all$visually_valid) & is.na(CO_all$validated.by), "lasca
 CO_all <- CO_all[!is.na(CO_all$visually_valid),]
 nrow(CO_all) #6619
 
-### save the CO_parameters with the validated info added as .RDS and .csv
+### save
 saveRDS(CO_all, file = paste0("CO_parameters_validated_", nrow(CO_all), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds"))
 
 write.csv(CO_all, file = paste0("CO_parameters_validated_", nrow(CO_all), "sessions_", format(Sys.Date(), format = "%b%d"), ".csv"))
 
-################ If you have processed only one batch of files, you can stop here. ###
 
 
-# If you need to combine multiple CO_parameters files, continue.
-
-################ SECTION 7: COMBINE SEPARATE CO_parameters files from different processing sessions (IF NEEDED) ############
-
-## Combine CO_parameters files and remove duplicates --------------
+## Combine to remove duplicates --------------
 params1 <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_validated_6619sessions_Jan30.rds")
 params2 <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_5041sessions_2016Jan30.rds")
 
@@ -504,7 +495,7 @@ params$ids <- paste(as.character(params[,6]), as.character(params[,7]), as.chara
 sum(duplicated(params)) #0
 sum(duplicated(params$file)) #0
 
-# these next lines are to look into what the issues are with the duplicated files. These have to be manually sorted out to some extent. 
+
 sum(duplicated(params[,2:24])) # 268 just have formatting probs with file
 params <- params[!duplicated(params[,2:24]),] #11392 rows
 
@@ -515,7 +506,7 @@ duprows <- params[params$ids %in% dups,] #78
 duprows <- arrange(duprows, ids)
 
 duprows[,c("file",  "sn", "lastdate", "set", "visually_valid", "visual_notes", "overall_valid")]
-# these are weird ones where the same file is assigned to two studyids. What to do - ASSUME THE ONE FROM PARAMS2 (later set) IS CORRECT? Maybe just leave these in for future appraisal.
+# these are weird ones where the same file is assigned to two studyids. ASSUME THE ONE FROM PARAMS2 (later set) IS CORRECT? Maybe just leave these in for future appraisal.
 
 # make the validation notes the same for the duplicated rows
 for (i in seq(from = 1, to = 78, by = 2)) {
@@ -526,7 +517,6 @@ for (i in seq(from = 1, to = 78, by = 2)) {
 
 duprows$is_duplicated <- TRUE
 
-# remove duplicates and save the CO_parameters
 params <- params[!params$file %in% duprows$file,]
 params$is_duplicated <- FALSE
 
@@ -534,13 +524,22 @@ params <- rbind(params, duprows) # 11392
 
 saveRDS(params, file = paste0(paste0("CO_parameters_all_", nrow(params), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds")))
 
-# separate out and save the unvalidated CO_parameters
 unvalidated <- params[is.na(params$visually_valid),]
 saveRDS(unvalidated, file = paste0(paste0("CO_parameters_unvalidated_", nrow(unvalidated), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds")))
 
 # go back to the top to process unvalidated files so they'll line up with the plots
 
-######################################### THE END 
+#########################################
 
 
+# generate 10% of previously validated data -----
+prior <- params[params$set == "params1",]
+tenpercent <- sample(1:6619, 662, replace=FALSE)
+reeval <- prior[tenpercent,]
+names(reeval)
+reeval[, c("visually_valid", "visual_notes", "validated.by")] <- NA
+reeval <- reeval[, c("file", "lascar", "sn", "firstdate", "mstudyid", "session", "co_cf", "co_cf_conf", "co_hours", "visually_valid", "visual_notes", "validated.by")]
+reeval <- arrange(reeval, lascar, sn, firstdate)
+
+write.csv(reeval, file = "CO_to_reevaluate.csv", row.names = FALSE)
 
