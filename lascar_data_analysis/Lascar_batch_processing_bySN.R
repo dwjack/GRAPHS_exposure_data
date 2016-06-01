@@ -562,15 +562,16 @@ saveRDS(unvalidated, file = paste0(paste0("CO_parameters_unvalidated_", nrow(unv
 
 
 # generate 10% of previously validated data -----
-prior <- params[params$set == "params1",]
-tenpercent <- sample(1:6619, 662, replace=FALSE)
+params <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_validated_11378sessions_May09.rds")
+prior <- params[params$set == "params1" & params$visually_valid >1,]
+tenpercent <- sample(1:1037, 500, replace=FALSE)
 reeval <- prior[tenpercent,]
 names(reeval)
 reeval[, c("visually_valid", "visual_notes", "validated.by")] <- NA
 reeval <- reeval[, c("file", "lascar", "sn", "firstdate", "mstudyid", "session", "co_cf", "co_cf_conf", "co_hours", "visually_valid", "visual_notes", "validated.by")]
 reeval <- arrange(reeval, lascar, sn, firstdate)
 
-write.csv(reeval, file = "CO_to_reevaluate.csv", row.names = FALSE)
+write.csv(reeval, file = "CO_to_reevaluate2.csv", row.names = FALSE)
 
 
 ##### Making complete dataset ----
