@@ -11,24 +11,24 @@
 # note that on some computers the pathname is ~/Dropbox/Ghana_exposure_data_SHARED_2014 while on others it is ~/Dropbox/Ghana_exposure_data_SHARED (1)
 # do a replace-all
 
-# Lascar SN lineup
-params <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_all_11392sessions_Jan30.rds")
-allSNs <- data.frame(SN = unique(params$sn))
-allSNs$lascar1 <- NA
-allSNs$lascar2 <- NA
-allSNs$lascar3 <- NA
-for (i in 1:nrow(allSNs)) {
-  allSNs$lascar1[i] <- unique(params$lascar[params$sn == allSNs$SN[i]])[1]
-  if(length(unique(params$lascar[params$sn == allSNs$SN[i]])) > 1) 
-  allSNs$lascar2[i] <- unique(params$lascar[params$sn == allSNs$SN[i]])[2]
-  if(length(unique(params$lascar[params$sn == allSNs$SN[i]])) > 1) 
-    allSNs$lascar3[i] <- unique(params$lascar[params$sn == allSNs$SN[i]])[3]
-}
-
-allSNs2 <- melt(allSNs, id.vars = "SN", value.name = "lascar") %>% arrange(SN)
-allSNs2 <- allSNs2[!is.na(allSNs2$lascar),]
-
-saveRDS(allSNs2, file = paste0("master_lascar_to_SN_list_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
+# # Get data to align Lascar names with SNs
+# params <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_all_11392sessions_Jan30.rds")
+# allSNs <- data.frame(SN = unique(params$sn))
+# allSNs$lascar1 <- NA
+# allSNs$lascar2 <- NA
+# allSNs$lascar3 <- NA
+# for (i in 1:nrow(allSNs)) {
+#   allSNs$lascar1[i] <- unique(params$lascar[params$sn == allSNs$SN[i]])[1]
+#   if(length(unique(params$lascar[params$sn == allSNs$SN[i]])) > 1) 
+#   allSNs$lascar2[i] <- unique(params$lascar[params$sn == allSNs$SN[i]])[2]
+#   if(length(unique(params$lascar[params$sn == allSNs$SN[i]])) > 1) 
+#     allSNs$lascar3[i] <- unique(params$lascar[params$sn == allSNs$SN[i]])[3]
+# }
+# 
+# allSNs2 <- melt(allSNs, id.vars = "SN", value.name = "lascar") %>% arrange(SN)
+# allSNs2 <- allSNs2[!is.na(allSNs2$lascar),]
+# 
+# saveRDS(allSNs2, file = paste0("master_lascar_to_SN_list_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
 
 ############ SECTION 0: LOAD PACKAGES AND FUNCTIONS ############
 # load packages
@@ -405,7 +405,7 @@ dev.off()
 
 
 
-### SECTION 6: ASSIGN MONTHLY CORRECTION FACTORS BY INTERPOLATION ######### 
+### SECTION 6: ASSIGN MONTHLY CORRECTION FACTORS - FIRST MONTHLY AVERAGES ######### 
 
 
 # calculate/set mean
