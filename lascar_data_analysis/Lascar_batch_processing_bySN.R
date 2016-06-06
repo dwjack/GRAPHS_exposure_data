@@ -40,7 +40,7 @@ cf_new <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_ca
 
 #create vector of all file names  -----
 files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=T) 
-length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818/ May 9 12221
+length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818/ June 6 12197
 
 
 # If you want to only include previously unvalidated files, do this
@@ -78,45 +78,32 @@ Lascar_data$lascar <- ifelse(substr(Lascar_data$lascar, start = nchar(Lascar_dat
 
 get.info <- function(x) { ####### read in first row of each data file and extract pertinent info
   
-  possibleError <- tryCatch(
-  dt <- read.csv(x, stringsAsFactors=F, header=T, nrows = 1)[,1:5],
-  error = function(e) e
-  )
-  if(!inherits(possibleError, "error")) {
-  
+  dt <- read.csv(x, stringsAsFactors=F, header=T, nrows = 1)[,1:5]
+
   dt$file2 <- basename(x)
   dt$lascar_infile <- names(dt)[1]
   dt$lascar_infile <- gsub("C0", "CO", dt$lascar)
   dt$lascar_infile <- gsub("-", "_", dt$lascar)
+  dt$lascar_infile <- gsub("\\.", "_", dt$lascar)
   dt$SN<- dt$Serial.Number
-  dt$datetime <- dmy_hms(dt$Time, tz="GMT")
-  dt$monthyear <- paste(months(dt$datetime), year(dt$datetime), sep = "_")
+  dt$firstdate <- dmy_hms(dt$Time, tz="GMT")
+  dt$monthyear <- paste(months(dt$firstdate), year(dt$firstdate), sep = "_")
   dt$firstline <- paste(dt[,2:5], collapse = "/")
-  dt <- dt[, c("file2", "SN", "lascar_infile", "monthyear", "firstline", "datetime")]
+  dt <- dt[, c("file2", "SN", "lascar_infile", "monthyear", "firstline", "firstdate")]
   dt
   }
-}
 
-file_data <- ldply(files, get.info, .progress = "text")
 
-file_data$lascar_infile <- gsub("\\.", "_", file_data$lascar_infile)
-file_data <- rename(file_data, firstdate = datetime)
-#
+file_data <- ldply(Lascar_data$file, get.info, .progress = "text")
 
 Lascar_data <- merge(Lascar_data, file_data, by = "file2")
 
 Lascar_data <- Lascar_data[!duplicated(Lascar_data$firstline),] # remove duplicates
-nrow(Lascar_data) #6623/ Jan 29 7152/ Jan 15, 2016 5041/ Feb 1 4726 / May 9 832
+nrow(Lascar_data) #6623/ Jan 29 7152/ Jan 15, 2016 5041/ Feb 1 4726 / May 9 832/ June 6 11854
 
 id_pattern <- "BM....."
 Lascar_data$mstudyid <- regmatches(Lascar_data$file2, regexpr(id_pattern, Lascar_data$file2))
 Lascar_data$newid <- paste(Lascar_data$lascar, Lascar_data$SN, Lascar_data$mstudyid, year(Lascar_data$firstdate), month(Lascar_data$firstdate), day(Lascar_data$firstdate), sep = "_")
-Lascar_data$newid2 <- paste(Lascar_data$lascar_infile, Lascar_data$SN, Lascar_data$mstudyid, year(Lascar_data$firstdate), month(Lascar_data$firstdate), day(Lascar_data$firstdate), sep = "_")
-
-sum(Lascar_data$newid %in% CO_parameters$newid) # 274: these ones already validated so remove
-sum(Lascar_data$newid2 %in% CO_parameters$newid) # 274: these ones already validated so remove
-
-Lascar_data <- Lascar_data[!Lascar_data$newid %in% CO_parameters$newid & !Lascar_data$newid2 %in% CO_parameters$newid,]
 
 table(year(Lascar_data$firstdate))
 
@@ -124,9 +111,8 @@ table(year(Lascar_data$firstdate))
 saveRDS(Lascar_data, file = paste0("Lascar_SN_data_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
 
 # match the CF (pulls the CF from the month of the last day of monitoring) - see "lascar_calibration_Jan2016.R"
-cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Apr29.rds")
+cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Apr29.rds")
 
-# Lascar_data$monthyear <- paste0(substr(Lascar_data$monthyear, nchar(Lascar_data$monthyear)-3, nchar(Lascar_data$monthyear)), substr(Lascar_data$monthyear, 1, nchar(Lascar_data$monthyear) - 5))
 
 Lascar_data$cf <- NA
 Lascar_data$cf_conf <- NA
@@ -139,12 +125,12 @@ for (i in 1:nrow(Lascar_data)){
 }
 Lascar_data$cf <- as.numeric(Lascar_data$cf)
 
-# get rid of files called "dropbox.attributes"
-dropbox_pattern <- "dropbox.attributes"
-Lascar_data <- Lascar_data[regexpr(dropbox_pattern, Lascar_data$file) == -1,]
+# # get rid of files called "dropbox.attributes"
+# dropbox_pattern <- "dropbox.attributes"
+# Lascar_data <- Lascar_data[regexpr(dropbox_pattern, Lascar_data$file) == -1,]
 
-summary(Lascar_data) # 66 NAs for cf
-length(unique(Lascar_data$SN[is.na(Lascar_data$cf)])) # 7 unique Lascars have no calib info
+summary(Lascar_data) # 345 NAs for cf
+length(unique(Lascar_data$SN[is.na(Lascar_data$cf)])) # 25 unique Lascars have no calib info
 
 # save Lascar_data with CFs added: "Lascar_data_cf_...."
 saveRDS(Lascar_data, file = paste0("Lascar_data_cf_", format(Sys.Date(), format = "%Y%b%d"), ".rds" ))
@@ -167,7 +153,7 @@ lascar.import <- function(file,cf, cf_conf) {
   dt$datetime <- ymd_hms(dt$datetime)
   dt$cf <- cf
   dt$cf_conf <- ifelse(!is.na(dt$cf[1]), cf_conf, "lo") # if CF is NA, set as low
-  cfgood <- !is.na(dt$cf[1]) & dt$cf[1]>=0.6 & dt$cf[1]<=1.2 # THIS IS WRONG, SHOULD BE 0.6-1.2
+  cfgood <- !is.na(dt$cf[1]) & dt$cf[1]>=0.6 & dt$cf[1]<=1.2 
   if(cfgood == TRUE) dt$co_corr <- dt$co/dt$cf
   if(cfgood == FALSE) dt$co_corr <- dt$co/0.85 # if CF is NA < 0.6, or > 1.2,  adjust with the mean
   dt
@@ -182,13 +168,13 @@ lascar.import <- function(file,cf, cf_conf) {
 
 ##################################
 # set a directory for the saved data. Also scroll down for the plot directory.
-directory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016May09/CO_stacked files/"
+directory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June06/CO_stacked files/"
 ##################################
 
 
 ptm <- proc.time()
 
-for (i in 1:length(unique(Lascar_data$SN))) { 
+for (i in 1:length(unique(Lascar_data$SN))) { # length(unique(Lascar_data$SN))
   files_bySN <- Lascar_data[Lascar_data$SN == unique(Lascar_data$SN)[i], c("file", "cf", "cf_conf")]
   
   CO_stacked <- mdply(files_bySN, lascar.import, .progress = "text") # mdply so can supply multiple arguments to lascar.import. Variable names of files_bySN must match those in lascar.import (file, cf, cf_conf)
@@ -238,7 +224,7 @@ for (i in 1:length(unique(Lascar_data$SN))) {
     #########################
     # set a directory for the saved plots & a meanCF to use for plots that have no CF
     #########################
-    plotdirectory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016May09/Plots by SN/"
+    plotdirectory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June06/Plots by SN/"
     meancf <- 0.85 #(mean across all units' CFs that were between 0.6 and 1.2 between Feb and Dec 2014)
     
     
@@ -251,7 +237,7 @@ for (i in 1:length(unique(Lascar_data$SN))) {
       CO_bysession <- filter(CO_stacked, file == unique(file)[j])
       
       # evaluate parameters
-      cfgood <- !is.na(CO_bysession$cf[1]) & CO_bysession$cf[1] >=0.6 & CO_bysession$cf[1] <=1.2 # THIS IS WRONG, SHOULD BE 0.6-1.2
+      cfgood <- !is.na(CO_bysession$cf[1]) & CO_bysession$cf[1] >=0.6 & CO_bysession$cf[1] <=1.2 
       mean <- ifelse(cfgood ==TRUE, round(mean(CO_bysession$co_corr, na.rm = TRUE), digits = 2), round(mean(CO_bysession$co/meancf, na.rm = TRUE), digits = 2))
       q90 <-ifelse(cfgood ==TRUE, round(quantile(CO_bysession$co_corr, probs = 0.9, na.rm = TRUE), digits = 2), round(quantile(CO_bysession$co/meancf, probs = 0.9, na.rm = TRUE), digits = 2))
       q98 <- ifelse(cfgood ==TRUE, round(quantile(CO_bysession$co_corr, probs = 0.98, na.rm = TRUE), digits =2), round(quantile(CO_bysession$co/meancf, probs = 0.98, na.rm = TRUE), digits =2))
@@ -305,11 +291,8 @@ proc.time()-ptm
 ### Calculating parameters for the saved data-------
 ####################################################################
 
-
-
-# new Feb01
-COfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016May09/CO_stacked files",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
-length(COfiles) #124
+COfiles <- list.files("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June06/CO_stacked files",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
+length(COfiles) #293
 
 
 # new adding day1, day2, day3 24-hour averages, and 72-hour average if available
@@ -368,7 +351,7 @@ CO_parameters$file <- basename(CO_parameters$file_all)
 
 
 CO_parameters <- CO_parameters[!is.na(CO_parameters$co_mean),] # removing NAs
-nrow(CO_parameters) #7152 / 2016 Jan17: 5041 / May 9: 539
+nrow(CO_parameters) #7152 / 2016 Jan17: 5041 / May 9: 539/ June 6 11854
 
 # Save the parameters - without validation info.
 saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
@@ -376,202 +359,219 @@ saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "ses
 
 
 
-######## Make forms to fill in later for validation ---------------
-savedfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016May09/CO_stacked files", full.names = TRUE)
-length(savedfiles)
+# ######## Make forms to fill in later for validation ---------------
+# savedfiles <- list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016May09/CO_stacked files", full.names = TRUE)
+# length(savedfiles)
+# 
+# directory <- "~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016May09/Validation Forms 2016May09/"
+# 
+# meancf <- 0.85
+# for (i in 1:length(savedfiles)){ #
+#   form <- data.frame()
+#   CO_stacked_bySN <- readRDS(savedfiles[i])
+#   CO_stacked_bySN <- arrange(CO_stacked_bySN, datetime)
+#   
+#   for (j in 1:length(unique(CO_stacked_bySN$file))) {
+#     CO_bysession <- filter(CO_stacked_bySN, file == unique(file)[j])
+#     CO_bysession <- arrange(CO_bysession, datetime)
+#     info <- CO_bysession[1, c(1,2,4:6,8:10)]
+#     info$file <- basename(info$file)
+#     info$number <- j
+#     info <- info[, c(9, 1,3,4,6:8,2,5)]
+#     info$duration_valid <- ifelse(difftime(CO_bysession$datetime[nrow(CO_bysession)], CO_bysession$datetime[1], units = "hours") >= 44, 1, 3)
+#     info$cf_valid <- ifelse((info$cf > 0.6 & info$cf < 1.2 &!is.na(info$cf)), 1, ifelse(((info$cf > 0.2 & info$cf < 0.6 &!is.na(info$cf))|(info$cf > 1.2 &!is.na(info$cf))), 2, 3))
+#     info$lascar <- gsub("\\.", "_", info$lascar)
+#     
+#     # evaluate co validity parameters
+#     q90 <-ifelse(!is.na(CO_bysession$cf[1]), round(quantile(CO_bysession$co_corr, probs = 0.9, na.rm = TRUE), digits = 2), round(quantile(CO_bysession$co/meancf, probs = 0.9, na.rm = TRUE), digits = 2))
+#     q98 <- ifelse(!is.na(CO_bysession$cf[1]), round(quantile(CO_bysession$co_corr, probs = 0.98, na.rm = TRUE), digits =2), round(quantile(CO_bysession$co/meancf, probs = 0.98, na.rm = TRUE), digits =2))
+#     sd <- ifelse(!is.na(CO_bysession$cf[1]), round(sd(CO_bysession$co_corr, na.rm =TRUE), digits = 2), round(sd(CO_bysession$co/meancf, na.rm =TRUE), digits = 2))
+#     min <- ifelse(!is.na(CO_bysession$cf[1]), round(min(CO_bysession$co_corr, na.rm = TRUE), digits = 2), round(min(CO_bysession$co/meancf, na.rm = TRUE), digits = 2))
+#     invalid <- q98==0|q90 > 20|sd > 60|min > 10
+#     info$co_valid_init <- ifelse(invalid == FALSE, 1, 2)
+#     info$NEW_CF <- ""
+#     info$CO_VALID <- ""
+#     info$NOTES_NOTES_NOTES <- ""
+#     info$Validated.by <- ""
+#     form <- rbind(form, info)
+#     write.csv(form, file = paste0(directory, "ValidityForm_", form$lascar[1], "_",form$SN[1], "_",format(Sys.Date(), format = "%Y%b"), ".csv"), row.names = FALSE)
+#   }
+#   
+#   print(i)
+# }
 
-directory <- "~/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/2016May09/Validation Forms 2016May09/"
-
-meancf <- 0.85
-for (i in 1:length(savedfiles)){ #
-  form <- data.frame()
-  CO_stacked_bySN <- readRDS(savedfiles[i])
-  CO_stacked_bySN <- arrange(CO_stacked_bySN, datetime)
-  
-  for (j in 1:length(unique(CO_stacked_bySN$file))) {
-    CO_bysession <- filter(CO_stacked_bySN, file == unique(file)[j])
-    CO_bysession <- arrange(CO_bysession, datetime)
-    info <- CO_bysession[1, c(1,2,4:6,8:10)]
-    info$file <- basename(info$file)
-    info$number <- j
-    info <- info[, c(9, 1,3,4,6:8,2,5)]
-    info$duration_valid <- ifelse(difftime(CO_bysession$datetime[nrow(CO_bysession)], CO_bysession$datetime[1], units = "hours") >= 44, 1, 3)
-    info$cf_valid <- ifelse((info$cf > 0.6 & info$cf < 1.2 &!is.na(info$cf)), 1, ifelse(((info$cf > 0.2 & info$cf < 0.6 &!is.na(info$cf))|(info$cf > 1.2 &!is.na(info$cf))), 2, 3))
-    info$lascar <- gsub("\\.", "_", info$lascar)
-    
-    # evaluate co validity parameters
-    q90 <-ifelse(!is.na(CO_bysession$cf[1]), round(quantile(CO_bysession$co_corr, probs = 0.9, na.rm = TRUE), digits = 2), round(quantile(CO_bysession$co/meancf, probs = 0.9, na.rm = TRUE), digits = 2))
-    q98 <- ifelse(!is.na(CO_bysession$cf[1]), round(quantile(CO_bysession$co_corr, probs = 0.98, na.rm = TRUE), digits =2), round(quantile(CO_bysession$co/meancf, probs = 0.98, na.rm = TRUE), digits =2))
-    sd <- ifelse(!is.na(CO_bysession$cf[1]), round(sd(CO_bysession$co_corr, na.rm =TRUE), digits = 2), round(sd(CO_bysession$co/meancf, na.rm =TRUE), digits = 2))
-    min <- ifelse(!is.na(CO_bysession$cf[1]), round(min(CO_bysession$co_corr, na.rm = TRUE), digits = 2), round(min(CO_bysession$co/meancf, na.rm = TRUE), digits = 2))
-    invalid <- q98==0|q90 > 20|sd > 60|min > 10
-    info$co_valid_init <- ifelse(invalid == FALSE, 1, 2)
-    info$NEW_CF <- ""
-    info$CO_VALID <- ""
-    info$NOTES_NOTES_NOTES <- ""
-    info$Validated.by <- ""
-    form <- rbind(form, info)
-    write.csv(form, file = paste0(directory, "ValidityForm_", form$lascar[1], "_",form$SN[1], "_",format(Sys.Date(), format = "%Y%b"), ".csv"), row.names = FALSE)
-  }
-  
-  print(i)
-}
-
-########## STOP AND DO VISUAL VALIDATION ##############
-
-## Add validation data in to CO_parameters --------
-## The forms reviewed in the Jan 2015 folder do not have correct CFs so just merge the visual CO validity data:  co_valid, NOTES_NOTES_NOTES, and Validated.by columns
-
-# load and merge CO validition forms 
-validforms <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/2016May09/Validation Forms Completed 2016May09/", full.names = TRUE)
-length(validforms) # 124
-
-import.list <- llply(validforms, read.csv, stringsAsFactors = FALSE) # warnings about "incomplete final lines" are ok?
-CO_validation <- Reduce(function(x, y) merge(x, y, all=T), import.list, accumulate=F)
-
-# check row length
-rows <- 0
-for (i in 1:length(import.list)) { 
-  a <- nrow(import.list[[i]])
-  rows <- sum(rows, a)
-  rows
-}
-rows # 539
-
-unique(CO_validation$CO_VALID) # check that only contains 1,2,3, and NA. If not, go back to forms and fix!
-
-# # merge by "file" in validation files (need to create similar variable in CO_parameters)
-# CO_parameters$file_all <- CO_parameters$file
-# CO_parameters$file <- basename(CO_parameters$file)
-CO_parameters <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_539sessions_2016May09.rds")
-
-# make a unique id to match both data frames
-CO_parameters$year <- year(CO_parameters$firstdate)
-CO_parameters$month <- month(CO_parameters$firstdate)
-CO_parameters$day <- day(CO_parameters$firstdate)
-CO_parameters$newid <- paste(CO_parameters$lascar, CO_parameters$sn, CO_parameters$mstudyid, CO_parameters$year, CO_parameters$month, CO_parameters$day, sep = "_")
-
-
-CO_validation$year <- year(mdy_hm(CO_validation$datetime, tz = "GMT"))
-CO_validation$year <- ifelse(as.numeric(CO_validation$year < 2000), CO_validation$year + 2000, CO_validation$year)
-CO_validation$month <- month(mdy_hm(CO_validation$datetime, tz = "GMT"))
-CO_validation$day <- day(mdy_hm(CO_validation$datetime, tz = "GMT"))
-CO_validation$newid <- paste(CO_validation$lascar, CO_validation$SN, CO_validation$mstudyid, CO_validation$year, CO_validation$month, CO_validation$day, sep = "_")
-
-# check what's going on with duplicates
-sum(duplicated(CO_validation$newid)) #0
-sum(duplicated(CO_parameters$newid)) #14
-dups <- CO_parameters$newid[duplicated(CO_parameters$newid)]
-CO_parameters[CO_parameters$newid %in% dups,c("file", "co_mean", "newid")] %>% arrange(newid)
-
-# these are all real duplicates so remove
-CO_parameters <- CO_parameters[!duplicated(CO_parameters$newid),]
-
-nrow(CO_parameters[CO_parameters$newid %in% CO_validation$newid,]) #5041
-
-# subset into validated before and validated now
-former <- CO_parameters[!CO_parameters$newid %in% CO_validation$newid,]
-summary(former$visually_valid) # only 1-3
-
-new <- CO_parameters[CO_parameters$newid %in% CO_validation$newid,]
-
-# get rid of "visually_valid", "visual_notes", "validated.by" if they exist
-new <- subset(new, select = -c(visually_valid, visual_notes, validated.by))
-
-CO_all <- merge(new, CO_validation[,c("newid", "CO_VALID", "NOTES_NOTES_NOTES", "Validated.by")], all.x = TRUE, by = "newid")
-
-colnames(CO_all) <- tolower(colnames(CO_all))
-colnames(CO_all)[colnames(CO_all) == "co_valid"] <- "visually_valid"
-colnames(CO_all)[colnames(CO_all) == "notes_notes_notes"] <- "visual_notes"
-
-# function to convert blanks to NA 
-
-blank2na <- function(x){ 
-  z <- gsub("\\s+", "", x)  #make sure it's "" and not " " etc
-  x[z==""] <- NA 
-  return(x)
-}
-
-CO_all$visual_notes <- blank2na(CO_all$visual_notes)
-CO_all$validated.by <- blank2na(CO_all$validated.by)
-
-table(CO_all$visually_valid, useNA = "always")
-
-### Calculate duration validity: 1 if >=44 hours, 2 if between 18 and 44 hours, 3 if < 18 hours -------
-CO_all$duration_valid <- ifelse(CO_all$co_hours >=44, 1, ifelse(CO_all$co_hours >=18, 2, 3))
-
-### Calculate overall validity
- ## 1 If cf_conf hi, visual validity =1 , duration =1
- ## 2 if cf_conf hi, visual validity =2, duration = 1 or 2
- ## 2 if cf_conf = hi, visual validity = 1, duration = 2
- ## 3 if cf_conf lo, visual validity =1 or 2, duration =1 or 2
- ## 4 if visual validity= 3 or duration = 3 or cf_conf = none
-
-CO_all$overall_valid <- ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 1, 1, ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid ==2 & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 2, ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 2, 2, ifelse(CO_all$co_cf_conf == "lo" & (CO_all$visually_valid == 1 | CO_all$visually_valid == 2) & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 3, ifelse(CO_all$visually_valid == 3 | CO_all$duration_valid == 3 | CO_all$co_cf_conf == "none", 4, NA)))))
-
-# Check forms
-colSums(is.na(CO_all)) # check for unexpected NAs
-unique(CO_all[!is.na(CO_all$visually_valid) & is.na(CO_all$validated.by), "lascar"])
-
-### Remove files that haven't been validated yet 
-CO_all <- CO_all[!is.na(CO_all$visually_valid),]
-nrow(CO_all) #6619
-
-
-# merge with previously validated
-former <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_validated_11378sessions_May09.rds")
-former <- subset(former, select = -ids)
-former <- subset(former, select = -ids)
-CO_all <- subset(CO_all, select = -c(year, month, day))
-CO_all$set <- "params2"
-CO_all$is_duplicated <- NA
-
-# align variables
-former <- former[, c(1:26, 31:33, 27:30)]
-
-CO_merged <- rbind(former, CO_all)
-table(CO_merged$visually_valid, useNA = "always")
-table(CO_merged$overall_valid, useNA = "always")
-
-### save
-saveRDS(CO_merged, file = paste0("CO_parameters_validated_", nrow(CO_merged), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds"))
-
-
-
-## Combine to remove duplicates --------------
-# params1 <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_validated_6619sessions_Jan30.rds")
-# params2 <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_5041sessions_2016Jan30.rds")
-
-# params1$set <- "params1"
-# params2$set <- "params2"
-# params <- rbind.fill(params1, params2) #11660 rows
-# params$cstudyid <- blank2na(params$cstudyid)
-# params$ids <- paste(as.character(params[,6]), as.character(params[,7]), as.character(params[,8]))
+# ########## STOP AND DO VISUAL VALIDATION ##############
+# 
+# ## Add validation data in to CO_parameters --------
+# ## The forms reviewed in the Jan 2015 folder do not have correct CFs so just merge the visual CO validity data:  co_valid, NOTES_NOTES_NOTES, and Validated.by columns
+# 
+# # load and merge CO validition forms 
+# validforms <- list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/2016May09/Validation Forms Completed 2016May09/", full.names = TRUE)
+# length(validforms) # 124
+# 
+# import.list <- llply(validforms, read.csv, stringsAsFactors = FALSE) # warnings about "incomplete final lines" are ok?
+# CO_validation <- Reduce(function(x, y) merge(x, y, all=T), import.list, accumulate=F)
+# 
+# # check row length
+# rows <- 0
+# for (i in 1:length(import.list)) { 
+#   a <- nrow(import.list[[i]])
+#   rows <- sum(rows, a)
+#   rows
+# }
+# rows # 539
+# 
+# unique(CO_validation$CO_VALID) # check that only contains 1,2,3, and NA. If not, go back to forms and fix!
+# 
+# # # merge by "file" in validation files (need to create similar variable in CO_parameters)
+# # CO_parameters$file_all <- CO_parameters$file
+# # CO_parameters$file <- basename(CO_parameters$file)
+# CO_parameters <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_539sessions_2016May09.rds")
+# 
+# # make a unique id to match both data frames
+# CO_parameters$year <- year(CO_parameters$firstdate)
+# CO_parameters$month <- month(CO_parameters$firstdate)
+# CO_parameters$day <- day(CO_parameters$firstdate)
+# CO_parameters$newid <- paste(CO_parameters$lascar, CO_parameters$sn, CO_parameters$mstudyid, CO_parameters$year, CO_parameters$month, CO_parameters$day, sep = "_")
+# 
+# 
+# CO_validation$year <- year(mdy_hm(CO_validation$datetime, tz = "GMT"))
+# CO_validation$year <- ifelse(as.numeric(CO_validation$year < 2000), CO_validation$year + 2000, CO_validation$year)
+# CO_validation$month <- month(mdy_hm(CO_validation$datetime, tz = "GMT"))
+# CO_validation$day <- day(mdy_hm(CO_validation$datetime, tz = "GMT"))
+# CO_validation$newid <- paste(CO_validation$lascar, CO_validation$SN, CO_validation$mstudyid, CO_validation$year, CO_validation$month, CO_validation$day, sep = "_")
+# 
+# # check what's going on with duplicates
+# sum(duplicated(CO_validation$newid)) #0
+# sum(duplicated(CO_parameters$newid)) #14
+# dups <- CO_parameters$newid[duplicated(CO_parameters$newid)]
+# CO_parameters[CO_parameters$newid %in% dups,c("file", "co_mean", "newid")] %>% arrange(newid)
+# 
+# # these are all real duplicates so remove
+# CO_parameters <- CO_parameters[!duplicated(CO_parameters$newid),]
+# 
+# nrow(CO_parameters[CO_parameters$newid %in% CO_validation$newid,]) #5041
+# 
+# # subset into validated before and validated now
+# former <- CO_parameters[!CO_parameters$newid %in% CO_validation$newid,]
+# summary(former$visually_valid) # only 1-3
+# 
+# new <- CO_parameters[CO_parameters$newid %in% CO_validation$newid,]
+# 
+# # get rid of "visually_valid", "visual_notes", "validated.by" if they exist
+# new <- subset(new, select = -c(visually_valid, visual_notes, validated.by))
+# 
+# CO_all <- merge(new, CO_validation[,c("newid", "CO_VALID", "NOTES_NOTES_NOTES", "Validated.by")], all.x = TRUE, by = "newid")
+# 
+# colnames(CO_all) <- tolower(colnames(CO_all))
+# colnames(CO_all)[colnames(CO_all) == "co_valid"] <- "visually_valid"
+# colnames(CO_all)[colnames(CO_all) == "notes_notes_notes"] <- "visual_notes"
+# 
+# # function to convert blanks to NA 
+# 
+# blank2na <- function(x){ 
+#   z <- gsub("\\s+", "", x)  #make sure it's "" and not " " etc
+#   x[z==""] <- NA 
+#   return(x)
+# }
+# 
+# CO_all$visual_notes <- blank2na(CO_all$visual_notes)
+# CO_all$validated.by <- blank2na(CO_all$validated.by)
+# 
+# table(CO_all$visually_valid, useNA = "always")
+# 
+# ### Calculate duration validity: 1 if >=44 hours, 2 if between 18 and 44 hours, 3 if < 18 hours -------
+# CO_all$duration_valid <- ifelse(CO_all$co_hours >=44, 1, ifelse(CO_all$co_hours >=18, 2, 3))
+# 
+# ### Calculate overall validity
+#  ## 1 If cf_conf hi, visual validity =1 , duration =1
+#  ## 2 if cf_conf hi, visual validity =2, duration = 1 or 2
+#  ## 2 if cf_conf = hi, visual validity = 1, duration = 2
+#  ## 3 if cf_conf lo, visual validity =1 or 2, duration =1 or 2
+#  ## 4 if visual validity= 3 or duration = 3 or cf_conf = none
+# 
+# CO_all$overall_valid <- ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 1, 1, ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid ==2 & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 2, ifelse(CO_all$co_cf_conf == "hi" & CO_all$visually_valid == 1 & CO_all$duration_valid == 2, 2, ifelse(CO_all$co_cf_conf == "lo" & (CO_all$visually_valid == 1 | CO_all$visually_valid == 2) & (CO_all$duration_valid == 1 | CO_all$duration_valid == 2), 3, ifelse(CO_all$visually_valid == 3 | CO_all$duration_valid == 3 | CO_all$co_cf_conf == "none", 4, NA)))))
+# 
+# # Check forms
+# colSums(is.na(CO_all)) # check for unexpected NAs
+# unique(CO_all[!is.na(CO_all$visually_valid) & is.na(CO_all$validated.by), "lascar"])
+# 
+# ### Remove files that haven't been validated yet 
+# CO_all <- CO_all[!is.na(CO_all$visually_valid),]
+# nrow(CO_all) #6619
+# 
+# 
+# # merge with previously validated
+# former <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_validated_11378sessions_May09.rds")
+# former <- subset(former, select = -ids)
+# former <- subset(former, select = -ids)
+# CO_all <- subset(CO_all, select = -c(year, month, day))
+# CO_all$set <- "params2"
+# CO_all$is_duplicated <- NA
+# 
+# # align variables
+# former <- former[, c(1:26, 31:33, 27:30)]
+# 
+# CO_merged <- rbind(former, CO_all)
+# table(CO_merged$visually_valid, useNA = "always")
+# table(CO_merged$overall_valid, useNA = "always")
+# 
+# ### save
+# saveRDS(CO_merged, file = paste0("CO_parameters_validated_", nrow(CO_merged), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds"))
+# 
+# 
+# 
+# ## Combine to remove duplicates --------------
+# # params1 <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_validated_6619sessions_Jan30.rds")
+# # params2 <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_5041sessions_2016Jan30.rds")
+# 
+# # params1$set <- "params1"
+# # params2$set <- "params2"
+# # params <- rbind.fill(params1, params2) #11660 rows
+# # params$cstudyid <- blank2na(params$cstudyid)
+# # params$ids <- paste(as.character(params[,6]), as.character(params[,7]), as.character(params[,8]))
+# 
+# 
+# sum(duplicated(CO_merged$newid)) #25
+# sum(duplicated(CO_merged[,c(1,3:10, 27,30:31)])) # 21
+# CO_merged <- CO_merged[!duplicated(CO_merged[,c(1,3:10, 27,30:31)]),]
+# CO_merged$rownumber <- row.names(CO_merged)
+# dups <- CO_merged$newid[duplicated(CO_merged$newid)] 
+# 
+# duprows <- CO_merged[CO_merged$newid %in% dups,] #8
+# duprows <- arrange(duprows, newid)
+# 
+# duprows <- duprows[,c(1,3:10, 27,30:31)]
+# duprows <- duprows[!duplicated(duprows),] # 29, still 4 problems: 2 with child ID, 2 with validation
+# 
+# CO_merged <- CO_merged[!CO_merged$rownumber %in% c(10014, 11553),] # the 2 with discordant validation - checked
+# 
+# params <- CO_merged
+# 
+# # save parameters file WITH validation: "CO_parameters_all_..." THE FINAL FILE ------
+# saveRDS(params, file = paste0(paste0("CO_parameters_all_", nrow(params), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds")))
+# 
+# # unvalidated <- params[is.na(params$visually_valid),]
+# # saveRDS(unvalidated, file = paste0(paste0("CO_parameters_unvalidated_", nrow(unvalidated), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds")))
+# 
+# # go back to the top to process unvalidated files so they'll line up with the plots
 
 
-sum(duplicated(CO_merged$newid)) #25
-sum(duplicated(CO_merged[,c(1,3:10, 27,30:31)])) # 21
-CO_merged <- CO_merged[!duplicated(CO_merged[,c(1,3:10, 27,30:31)]),]
-CO_merged$rownumber <- row.names(CO_merged)
-dups <- CO_merged$newid[duplicated(CO_merged$newid)] 
+### COMBINE WITH MASTER VALIDATION INFO ####
+CO_parameters <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_parameters_11854sessions_2016Jun06.rds")
+validation <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_validation_info_11892sessions_2016Jun05.rds")
 
-duprows <- CO_merged[CO_merged$newid %in% dups,] #8
-duprows <- arrange(duprows, newid)
+#make a unique id to match both data frames
+CO_parameters$newid <- paste(CO_parameters$lascar, CO_parameters$sn, CO_parameters$mstudyid, year(CO_parameters$firstdate), month(CO_parameters$firstdate), day(CO_parameters$firstdate), sep = "_")
 
-duprows <- duprows[,c(1,3:10, 27,30:31)]
-duprows <- duprows[!duplicated(duprows),] # 29, still 4 problems: 2 with child ID, 2 with validation
+CO_withvalidation <- merge(CO_parameters, validation[, 1:7], by = "newid", all.x = TRUE)
+CO_withvalidation <- rename(CO_withvalidation, file_from_parameters = file_all.x)
+CO_withvalidation <- rename(CO_withvalidation, file_from_validation = file_all.y)
 
-CO_merged <- CO_merged[!CO_merged$rownumber %in% c(10014, 11553),] # the 2 with discordant validation - checked
 
-params <- CO_merged
+### SAVE DATA WITH VALIDATION ####
 
-# save parameters file WITH validation: "CO_parameters_all_..." THE FINAL FILE ------
-saveRDS(params, file = paste0(paste0("CO_parameters_all_", nrow(params), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds")))
-
-# unvalidated <- params[is.na(params$visually_valid),]
-# saveRDS(unvalidated, file = paste0(paste0("CO_parameters_unvalidated_", nrow(unvalidated), "sessions_", format(Sys.Date(), format = "%b%d"), ".rds")))
-
-# go back to the top to process unvalidated files so they'll line up with the plots
+saveRDS(CO_withvalidation, file =  paste0("FINAL_CO_parameters_withvalidation_", format(Sys.Date(), format = "%Y%b%d"), ".rds" ))
 
 ###############Other stuff for review purposes, not necessary ######
 
