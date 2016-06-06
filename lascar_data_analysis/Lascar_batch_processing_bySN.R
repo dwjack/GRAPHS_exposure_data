@@ -30,7 +30,7 @@ require(reshape2)
 ####
 # files needed: Calibration Factors, generated from the script "lascar_calibration_Jan2016.R"
 
-cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Apr29.rds")
+cf_new <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_calibration_documents/Calibration Factors/Datasets/calib_factors_bymonth_interp_2016Apr29.rds")
 
 
 #####################
@@ -40,7 +40,7 @@ cf_new <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_docum
 
 #create vector of all file names  -----
 files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=T) 
-length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818/ May 9 12229
+length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818/ May 9 12221
 
 
 # If you want to only include previously unvalidated files, do this
@@ -52,7 +52,7 @@ length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818/ May 
 # length(files) # 4735
 sum(duplicated(basename(files))) # should be 0? but is 9... sometimes there is a typo is the full file name
 files <- files[!duplicated(basename(files))]
-length(files) # 4726
+length(files) # 12183
 
 # make a data frame of info from the files--------------
 Lascar_data <- data.frame(file = files, stringsAsFactors = FALSE)
