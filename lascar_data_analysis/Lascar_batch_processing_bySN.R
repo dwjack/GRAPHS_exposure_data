@@ -10,6 +10,8 @@
 
 # The most recent parameters file is: 
 # params <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_parameters_11892sessions_2016Jun05.rds")
+params <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/FINAL_CO_parameters_withvalidation_2016Jun06.rds")
+write.csv(params, file = paste0("FINAL_CO_parameters_withvalidation", nrow(params), "sessions_", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
 
 # Validation info:
 # validation_info <- readRDS("~/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/CO_validation_info_11892sessions_2016Jun05.rds")
@@ -204,10 +206,10 @@ for (i in 1:length(unique(Lascar_data$SN))) {
   CO_stacked$cstudyid <- regexpr(child_pattern, CO_stacked$file)
   CO_stacked$cstudyid <- ifelse(CO_stacked$cstudyid == -1, NA, substr(x = CO_stacked$file, start = CO_stacked$cstudyid, stop = CO_stacked$cstudyid + 6))
   
-  # grab session info
-  # grab session info: do in multipe steps to deal with bad value propagation after NA
+  # grab session info - NEED TO DO WITH BASENAME(FILE) not FILE
+  # grab session info: do in multiple steps to deal with bad value propagation after NA
   session_pattern <- "(s_[0123456789]{1,2}|s[0123456789]{1,2})"
-  CO_stacked$session <- regmatches(CO_stacked$file, regexpr(session_pattern, CO_stacked$file, ignore.case =TRUE))
+  CO_stacked$session <- regmatches(basename(CO_stacked$file), regexpr(session_pattern, basename(CO_stacked$file), ignore.case =TRUE))
   CO_stacked$session <- tolower(CO_stacked$session)
   
   # order from most recent to oldest
