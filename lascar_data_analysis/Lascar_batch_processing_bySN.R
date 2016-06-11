@@ -601,10 +601,11 @@ max(sessioncheck$Freq) # 2
 sessioncheck2 <- data.frame(table(CO_withvalidation$cstudyid[!is.na(CO_withvalidation$cstudyid)], CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid)]))
 max(sessioncheck2$Freq) # 2
 
-colSums(table(CO_withvalidation$cstudyid[!is.na(CO_withvalidation$cstudyid)], CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid)])) # 11 child sessions are s_05, 8 are s_06, and 5 are s_07. Change 5s and 6s, 7s more complicated so leave for now?
+colSums(table(CO_withvalidation$cstudyid[!is.na(CO_withvalidation$cstudyid)], CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid)])) # 11 child sessions are s_05, 8 are s_06, and 5 are s_07.
 
 CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid) & CO_withvalidation$session == "s_05"] <- "s_01"
 CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid) & CO_withvalidation$session == "s_06"] <- "s_02"
+
 
 
 ### SAVE DATA WITH VALIDATION ####
