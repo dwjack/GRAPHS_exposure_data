@@ -40,7 +40,7 @@ cf_new <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_ca
 
 #create vector of all file names  -----
 files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED_2014/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=T) 
-length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818/ June 6 12197
+length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818/ June 6 12197/ June 10 11898
 
 
 # If you want to only include previously unvalidated files, do this
@@ -50,9 +50,9 @@ length(files) #6656 / 6937 / Jan 29 7472 / Jan 17, 2016 11681 /Feb 1 11818/ June
 
 # files <- files[basename(files) %in% basename(unvalidated$file_all)]
 # length(files) # 4735
-sum(duplicated(basename(files))) # should be 0? but is 9... sometimes there is a typo is the full file name
+sum(duplicated(basename(files))) #0
 files <- files[!duplicated(basename(files))]
-length(files) # 12183
+length(files) # 12185
 
 # make a data frame of info from the files--------------
 Lascar_data <- data.frame(file = files, stringsAsFactors = FALSE)
@@ -98,8 +98,15 @@ file_data <- ldply(Lascar_data$file, get.info, .progress = "text")
 
 Lascar_data <- merge(Lascar_data, file_data, by = "file2")
 
-Lascar_data <- Lascar_data[!duplicated(Lascar_data$firstline),] # remove duplicates
-nrow(Lascar_data) #6623/ Jan 29 7152/ Jan 15, 2016 5041/ Feb 1 4726 / May 9 832/ June 6 11854
+# identifying duplicate files
+samefiles <- Lascar_data$firstline[duplicated(Lascar_data$firstline)]
+same <- filter(Lascar_data, firstline %in% samefiles) %>% arrange(firstline)
+same <- same[, c("file2", "file", "firstline")]
+same$file <- gsub("/Users/Adoption", "~", same$file)
+write.csv(same, file = "duplicated_files.csv")
+
+#Lascar_data <- Lascar_data[!duplicated(Lascar_data$firstline),] # remove duplicates
+nrow(Lascar_data) #6623/ Jan 29 7152/ Jan 15, 2016 5041/ Feb 1 4726 / May 9 832/ June 6 11854/ June 10 11898
 
 id_pattern <- "BM....."
 Lascar_data$mstudyid <- regmatches(Lascar_data$file2, regexpr(id_pattern, Lascar_data$file2))
@@ -168,13 +175,13 @@ lascar.import <- function(file,cf, cf_conf) {
 
 ##################################
 # set a directory for the saved data. Also scroll down for the plot directory.
-directory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June06/CO_stacked files/"
+directory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June10/CO_stacked files/"
 ##################################
 
 
 ptm <- proc.time()
 
-for (i in 1:length(unique(Lascar_data$SN))) { # length(unique(Lascar_data$SN))
+for (i in 110:length(unique(Lascar_data$SN))) { # length(unique(Lascar_data$SN))
   files_bySN <- Lascar_data[Lascar_data$SN == unique(Lascar_data$SN)[i], c("file", "cf", "cf_conf")]
   
   CO_stacked <- mdply(files_bySN, lascar.import, .progress = "text") # mdply so can supply multiple arguments to lascar.import. Variable names of files_bySN must match those in lascar.import (file, cf, cf_conf)
@@ -224,7 +231,7 @@ for (i in 1:length(unique(Lascar_data$SN))) { # length(unique(Lascar_data$SN))
     #########################
     # set a directory for the saved plots & a meanCF to use for plots that have no CF
     #########################
-    plotdirectory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June06/Plots by SN/"
+    plotdirectory <- "/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June10/Plots by SN/"
     meancf <- 0.85 #(mean across all units' CFs that were between 0.6 and 1.2 between Feb and Dec 2014)
     
     
@@ -291,7 +298,7 @@ proc.time()-ptm
 ### Calculating parameters for the saved data-------
 ####################################################################
 
-COfiles <- list.files("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June06/CO_stacked files",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
+COfiles <- list.files("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_2016June10/CO_stacked files",recursive=FALSE, pattern = ".rds",full.names=TRUE) 
 length(COfiles) #293
 
 
@@ -351,7 +358,8 @@ CO_parameters$file <- basename(CO_parameters$file_all)
 
 
 CO_parameters <- CO_parameters[!is.na(CO_parameters$co_mean),] # removing NAs
-nrow(CO_parameters) #7152 / 2016 Jan17: 5041 / May 9: 539/ June 6 11854
+nrow(CO_parameters) #7152 / 2016 Jan17: 5041 / May 9: 539/ June 6 11854/ June 10 11898
+
 
 # Save the parameters - without validation info.
 saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "sessions_", format(Sys.Date(), format = "%Y%b%d"), ".rds"))
@@ -558,20 +566,51 @@ saveRDS(CO_parameters, file = paste0("CO_parameters_", nrow(CO_parameters), "ses
 
 
 ### COMBINE WITH MASTER VALIDATION INFO ####
-CO_parameters <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_parameters_11854sessions_2016Jun06.rds")
+CO_parameters <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_parameters_11898sessions_2016Jun10.rds")
 validation <- readRDS("/Users/Adoption/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/CO_validation_info_11892sessions_2016Jun05.rds")
 
 #make a unique id to match both data frames
 CO_parameters$newid <- paste(CO_parameters$lascar, CO_parameters$sn, CO_parameters$mstudyid, year(CO_parameters$firstdate), month(CO_parameters$firstdate), day(CO_parameters$firstdate), sep = "_")
 
 CO_withvalidation <- merge(CO_parameters, validation[, 1:7], by = "newid", all.x = TRUE)
-CO_withvalidation <- rename(CO_withvalidation, file_from_parameters = file_all.x)
-CO_withvalidation <- rename(CO_withvalidation, file_from_validation = file_all.y)
+CO_withvalidation <- rename(CO_withvalidation, file_from_parameters = file)
+CO_withvalidation <- rename(CO_withvalidation, file_from_validation = file_all)
+
+# fix a few session typos
+CO_withvalidation$session[CO_withvalidation$session == "s01"] <- "s_01"
+CO_withvalidation$session[CO_withvalidation$session == "s2"] <- "s_02"
+CO_withvalidation$session[CO_withvalidation$session == "s_2"] <- "s_02"
+CO_withvalidation$session[CO_withvalidation$session == "s_0"] <- "s_02"
+CO_withvalidation$session[CO_withvalidation$session == "s_15"] <- "s_01"
+CO_withvalidation$session[basename(CO_withvalidation$file_from_parameters) == "CU_CO_104_BM1546M_22Jun15_s_05_dup.txt"] <- "s_04"
+
+# blank to NA
+blank2na <- function(x){ 
+  z <- gsub("\\s+", "", x)  #make sure it's "" and not " " etc
+  x[z==""] <- NA 
+  return(x)
+}
+
+CO_withvalidation$cstudyid <- blank2na(CO_withvalidation$cstudyid)
+# check sessions
+# mother files
+sessioncheck <- data.frame(table(CO_withvalidation$mstudyid[is.na(CO_withvalidation$cstudyid)], CO_withvalidation$session[is.na(CO_withvalidation$cstudyid)]))
+max(sessioncheck$Freq) # 2
+
+# child files
+sessioncheck2 <- data.frame(table(CO_withvalidation$cstudyid[!is.na(CO_withvalidation$cstudyid)], CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid)]))
+max(sessioncheck2$Freq) # 2
+
+colSums(table(CO_withvalidation$cstudyid[!is.na(CO_withvalidation$cstudyid)], CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid)])) # 11 child sessions are s_05, 8 are s_06, and 5 are s_07. Change 5s and 6s, 7s more complicated so leave for now?
+
+CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid) & CO_withvalidation$session == "s_05"] <- "s_01"
+CO_withvalidation$session[!is.na(CO_withvalidation$cstudyid) & CO_withvalidation$session == "s_06"] <- "s_02"
 
 
 ### SAVE DATA WITH VALIDATION ####
 
 saveRDS(CO_withvalidation, file =  paste0("FINAL_CO_parameters_withvalidation_", format(Sys.Date(), format = "%Y%b%d"), ".rds" ))
+write.csv(CO_withvalidation, file =  paste0("FINAL_CO_parameters_withvalidation_", format(Sys.Date(), format = "%Y%b%d"), ".csv" ), row.names = FALSE)
 
 ###############Other stuff for review purposes, not necessary ######
 
