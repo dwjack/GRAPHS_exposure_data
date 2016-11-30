@@ -53,8 +53,6 @@ dataPEM <- dataPEM[dataPEM$Date!="",]       #get rid of empty rows
 # get original date time
 originalDateTime <- paste(dataPEM$Date, dataPEM$Time, sep = " ")
 
-#       dplyr::mutate(Date = lubridate::force_tz(Date,
-#         "Atlantic/Madeira")) %>%
 # Warning: Time does not have time zone
 # create a variable with date and time together
 
@@ -427,12 +425,12 @@ MicroPEM$tupemoff = str_pad(MicroPEM$tupemoff, 4, pad = "0")
 MicroPEM$thepaon2[MicroPEM$thepaon2=="0000"|MicroPEM$thepaon2=="9999"]=NA
 MicroPEM$thepaoff2[MicroPEM$thepaoff2=="0000"|MicroPEM$thepaoff2=="9999"]=NA
 
-#HEPA start Datetime
+#HEPA start Datetime in logsheet
 MicroPEM$HEPA1St = paste(MicroPEM$datevisit, MicroPEM$thepaon1)         
 MicroPEM$HEPA1St = dmy_hm(as.character(MicroPEM$HEPA1St), tz="GMT")
 range(MicroPEM$HEPA1St)
 
-#HEPA end Datetime
+#HEPA end Datetime in logsheet
 MicroPEM$HEPA2St = paste(MicroPEM$pickupdtd, MicroPEM$thepaon2)         
 MicroPEM$HEPA2St = dmy_hm(as.character(MicroPEM$HEPA2St), tz="GMT")
 which(is.na(MicroPEM$HEPA2St))
@@ -448,8 +446,8 @@ MicroPEM$filterid[which(is.na(MicroPEM$mstudyid))]
 which(MicroPEM$filterid=="KHC031B")
 MicroPEM$filterid[MicroPEM$filterid=="KHC031B"] = "KHCD31B"           
 
-
 ##################################IDENTIFY HEPA CHANGEPOINT###################################
+require(changepoint)
 QualityControl1 = QualityControl[order(QualityControl$filterID),]     # sort observation by filterID
 
 HEPAdata = NULL     # creat an empty data frame to store HEPA information
@@ -468,45 +466,55 @@ for(k in 1:nrow(QualityControl1)){
   
   Data5 = Data3[Data3$timeDate>=(Data4$starttime_new)&Data3$timeDate<=(Data4$endtime_new),]    # extract readings between starttime and endtime
   Data5 = Data5[Data5$relativeHumidity>0 & Data5$relativeHumidity<100,]           # drop measurements with RH <=0 or RH>=100
-  Data4$startlog = ifelse(length(MicroPEM_Compound$THEPAON1[MicroPEM_Compound$FILTERID==as.character(Data4$filterID)])==0, 
-                                  NA, MicroPEM_Compound$THEPAON1[MicroPEM_Compound$FILTERID==as.character(Data4$filterID)])
-  Data4$endlog = ifelse(length(MicroPEM_Compound$TUPEMOFF[MicroPEM_Compound$FILTERID==as.character(Data4$filterID)])==0, 
-                                  NA, MicroPEM_Compound$TUPEMOFF[MicroPEM_Compound$FILTERID==as.character(Data4$filterID)])
-  Data4$nephelometer_avg = mean(Data5$nephelometer) 
+  # find the starttime in the logsheet
+  Data4$startlog = ifelse(length(MicroPEM$thepaon1[MicroPEM$filterid==as.character(Data4$filterID)])==0, 
+                                  NA, MicroPEM$thepaon1[MicroPEM$filterid==as.character(Data4$filterID)])
+  # find the endtime in the logsheet
+  Data4$endlog = ifelse(length(MicroPEM$tupemoff[MicroPEM$filterid==as.character(Data4$filterID)])==0, 
+                                  NA, MicroPEM$tupemoff[MicroPEM_Compound$filterid==as.character(Data4$filterID)])
+  Data4$nephelometer_avg = mean(Data5$nephelometer)   # add mean nephelometer reading
   
-  Data6 = Data5[7:100,]
+  # find the point when nephelometer reading changed significantly at the start
+  Data6 = Data5[7:100,]   # exclude the first 6 readings (about 1 minute)
   HEPASt = cpt.meanvar(Data6$nephelometer,method="BinSeg", Q=3, minseglen=8)
-  Data4$HEPAstnumber = HEPASt@cpts[1]
+  Data4$HEPAstnumber = HEPASt@cpts[1]        # identify the place where changepoint is
   if(Data4$HEPAstnumber==94){
     Data4$HEPAsttime1 = NA
     Data4$HEPAsttime2 = NA
     Data4$HEPAstvalue1 = NA
     Data4$HEPAstvalue2 = NA
   } else {
-    Data4$HEPAsttime1 = Data5$timeDate[7]
-    Data4$HEPAsttime2 = Data5$timeDate[Data4$HEPAstnumber+6]
-    Data4$HEPAstvalue1 = mean(Data6$nephelometer[1:Data4$HEPAstnumber], trim=1/Data4$HEPAstnumber) # exclude max and min readings
+    Data4$HEPAsttime1 = Data5$timeDate[7]              # the starttime of start HEPA
+    Data4$HEPAsttime2 = Data5$timeDate[Data4$HEPAstnumber+6]   # the endtime of start HEPA
+    # the mean nephelometer reading in start HEPA, excluding max and min readings
+    Data4$HEPAstvalue1 = mean(Data6$nephelometer[1:Data4$HEPAstnumber], trim=1/Data4$HEPAstnumber) 
+    # the mean nephelometer reading after start HEPA period (within the first 100 readings)
     Data4$HEPAstvalue2 = mean(Data6$nephelometer[(Data4$HEPAstnumber+1):94])
   }
+  # plot the first 100 readings and show the changepoint
   title <- paste(Data4$filterID, Data4$deviceSerial, format(Data4$starttime_new, format = "%b %d %Y"), "StHEPA=", Data4$HEPAstnumber,
                  "\n",  Data4$starttime_new, "startlog=", Data4$startlog)
-  plot(HEPASt,cpt.width=3)  #plot Start HEPA
+  plot(HEPASt,cpt.width=3)  
   title(main = title,  cex.main = 0.7, col.main = "black") 
   
+  # find the point when nephelometer reading changed significantly at the end
   Data7 = Data5[(nrow(Data5)-3):(nrow(Data5)-99),]
   HEPAEnd = cpt.meanvar(Data7$nephelometer,method="BinSeg", Q=3, minseglen=8)
-  Data4$HEPAendnumber = HEPAEnd@cpts[1]
+  Data4$HEPAendnumber = HEPAEnd@cpts[1]        # identify the place where changepoint is
   if(Data4$HEPAendnumber==97){
     Data4$HEPAendtime1 = NA
     Data4$HEPAendtime2 = NA
     Data4$HEPAendvalue1 = NA
     Data4$HEPAendvalue2 = NA
   } else {
-    Data4$HEPAendtime1 = Data5$timeDate[nrow(Data5)-2-Data4$HEPAendnumber]
-    Data4$HEPAendtime2 = Data5$timeDate[nrow(Data5)-3]
-    Data4$HEPAendvalue1 = mean(Data7$nephelometer[1:Data4$HEPAendnumber], trim=1/Data4$HEPAendnumber)  # exclude max and min readings
+    Data4$HEPAendtime1 = Data5$timeDate[nrow(Data5)-2-Data4$HEPAendnumber]   # the starttime of end HEPA
+    Data4$HEPAendtime2 = Data5$timeDate[nrow(Data5)-3]                       # the endtime of end HEPA
+    # the mean nephelometer reading in end HEPA, excluding max and min readings
+    Data4$HEPAendvalue1 = mean(Data7$nephelometer[1:Data4$HEPAendnumber], trim=1/Data4$HEPAendnumber)
+    # the mean nephelometer reading before end HEPA period (within the last 100 readings)
     Data4$HEPAendvalue2 = mean(Data7$nephelometer[(Data4$HEPAendnumber+1):97])
   }
+  # plot the last 100 readings and show the changepoint
   title <- paste(Data4$filterID, Data4$deviceSerial, format(Data4$starttime_new, format = "%b %d %Y"), "EndHEPA=", Data4$HEPAendnumber,
                  "\n",  Data4$Endtime_new,"endlog=", Data4$endlog, "lowbat=", Data4$lowbattery, "deadbat=", Data4$deadbattery)
   plot(HEPAEnd,cpt.width=3) #plot end HEPA
