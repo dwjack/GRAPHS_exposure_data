@@ -1,0 +1,9 @@
+################################# FIND THE DATA FILES ############################################ 
+filedirectory <- "/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPem Raw Data/Nephelometer_processed_correct"
+Datafiles = list.files(filedirectory,full.names = TRUE)    #grab all MicroPEM files
+
+excludelist <-c("KHC0234")  # files with no nephelometer reading
+excludefiles <-Datafiles[unlist(sapply(excludelist, function(x) grep(x, Datafiles)))]
+Datafiles <- Datafiles[!(Datafiles %in% excludefiles)]            # removes empty files with no nephelometer reading
+MicroPEMfiles <- as.data.frame(Datafiles)                         # create a dataframe of datafiles
+
