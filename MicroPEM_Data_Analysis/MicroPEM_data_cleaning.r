@@ -478,7 +478,7 @@ for(k in 1:nrow(QualityControl1)){
   Data6 = Data5[7:100,]   # exclude the first 6 readings (about 1 minute)
   HEPASt = cpt.meanvar(Data6$nephelometer,method="BinSeg", Q=3, minseglen=8)
   Data4$HEPAstnumber = HEPASt@cpts[1]        # identify the place where changepoint is
-  if(Data4$HEPAstnumber==94){
+  if(Data4$HEPAstnumber==94){                # if there is no changepoint in the first 100 readings then no start HEPA
     Data4$HEPAsttime1 = NA
     Data4$HEPAsttime2 = NA
     Data4$HEPAstvalue1 = NA
@@ -498,10 +498,10 @@ for(k in 1:nrow(QualityControl1)){
   title(main = title,  cex.main = 0.7, col.main = "black") 
   
   # find the point when nephelometer reading changed significantly at the end
-  Data7 = Data5[(nrow(Data5)-3):(nrow(Data5)-99),]
+  Data7 = Data5[(nrow(Data5)-3):(nrow(Data5)-99),]     # exclude the last 3 readings (about 1 minute)
   HEPAEnd = cpt.meanvar(Data7$nephelometer,method="BinSeg", Q=3, minseglen=8)
   Data4$HEPAendnumber = HEPAEnd@cpts[1]        # identify the place where changepoint is
-  if(Data4$HEPAendnumber==97){
+  if(Data4$HEPAendnumber==97){                 # if there is no changepoint in the last 100 readings then no end HEPA
     Data4$HEPAendtime1 = NA
     Data4$HEPAendtime2 = NA
     Data4$HEPAendvalue1 = NA
@@ -520,9 +520,24 @@ for(k in 1:nrow(QualityControl1)){
   plot(HEPAEnd,cpt.width=3) #plot end HEPA
   title(main = title,  cex.main = 0.7, col.main = "black") 
   
-  HEPAdata = rbind(HEPAdata, Data4)
+  HEPAdata = rbind(HEPAdata, Data4)        # update HEPAdata data frame
   
   if(round(k/50)*50==k)               
     print(k) 
 }
 dev.off()
+
+##################################HEPA PERIOD IDENTIFICATION#########################
+# make sure the filepath is correct
+HEPAtime = readRDS("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/HEPAtime.rds") 
+
+HEPAtime$HEPAsttime1 = mdy_hms(HEPAtime$HEPAsttime1,tz="GMT")
+HEPAtime$HEPAsttime2 = mdy_hms(HEPAtime$HEPAsttime2,tz="GMT")
+HEPAtime$HEPAendtime1 = mdy_hms(HEPAtime$HEPAendtime1,tz="GMT")
+HEPAtime$HEPAendtime2 = mdy_hms(HEPAtime$HEPAendtime2,tz="GMT")  
+  
+  
+  
+  
+  
+  
