@@ -662,7 +662,7 @@ for(k in 1:nrow(QualityControl2)){
 dev.off()   
   
 ##################################NEPHELOMETER VALIDATION#########################
-#read in validation index of nephelometer data
+# read in validation index of nephelometer data
 Validation = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/VisualizedValidation.csv", header=TRUE)    
     
 table(Validation$Validity)    # frequency of visual validity
@@ -676,4 +676,53 @@ Nephelometer1$Harmattan[Nephelometer1$Note=="elevated baseline"] = 1
 # drop samples with invalid nephelometer data
 Nephelometer2 = Nephelometer1[Nephelometer1$Validity!=4,]
   
-  
+#################################GRAVIMETRIC SAMPLE DATA ########################################
+# read in gravimetric PM data, make sure filepath is correct
+GravimetricPM = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/FilterWeight.csv", header=TRUE,stringsAsFactors=FALSE)   
+
+Damagedfilter = c("GN012", "GN016", "GN019", "GN020", "GN021", "GN022", "GN025", "GN028", "GN030", "GN031", "GN032", "GN033",
+                  "GN034", "GN036", "GN044", "GN046", "GN052", "GN053", "GN054", "GN055", "GN057", "GN059", "GN060", "GN065", "GN067", "GN068",
+                  "GN069", "GN076", "GN078", "GN091", "KHC0304", "KHC0305", "KHC0306", "KHC0307", "KHC0308", "KHC0310", "KHC0311", "KHC0312", "KHC0313", "KHC0325",
+                  "KHC0332", "KHC0333", "KHC0365", "KHC0366", "KHC0367", "KHC0368", "KHC0369", "KHC0373", "KHC0375", "KHC0376", "KHC0377", "KHC0378", "KHC0379",
+                  "KHC0380", "KHC0381", "KHC0382","KHC0383","KHC0384","KHC0385","KHC0386","KHC0387", "KHC0389", "KHC0390","KHC0391", "KHC0392", "KHC0393", "KHC0394",
+                  "KHC0395", "KHC0396", "KHC0397", "KHC0398", "KHC0399", "KHC0463", "KHC1025", "KHC1026", "KHC1251","KHC1567")
+                 
+Outlier = c("KHC0353", "KHC0783", "KHC1000", "KHC1325", "KHC1864")
+
+Unmatched = c("KHC0133", "KHC0163", "KHC0168", "KHC0203", "KHC0275", "KHC0276", "KHC0421", "KHC0452", "KHC0459", 
+              "KHC0536", "KHC0625", "KHC0673", "KHC0679", "KHC0686", "KHC0816", "KHC0947", "KHC1005", "KHC1160", "KHC1173", "KHC1347", 
+              "KHC1348", "KHC1373", "KHC1406", "KHC1432", "KHC1622", "KHC1623", "KHC1624", "KHC1625", "KHC1626", "KHC1627", "KHC1628", 
+              "KHC1629", "KHC1630", "KHC1631", "KHC1652", "KHC1696", "KHC1720", "KHC1769", "KHC1771", "KHC1783", "KHC1833")
+
+# create an index to categorize Gravimetric Sample
+GravimetricPM$index = "GOOD"
+GravimetricPM$index[GravimetricPM$filterID %in% Unmatched] = "Unmatched"
+GravimetricPM$index[GravimetricPM$filterID %in% Outlier] = "Outlier"
+GravimetricPM$index[GravimetricPM$filterID %in% Damagedfilter] = "Damaged" 
+
+################################Merge Nephelometer and Gravimetric Data###################################
+PM_Data = merge(Nephelometer2, GravimetricPM , by="filterID", all.x=T)    # merge valid nephelometer data with Gravimetric PM data
+
+#create an index for gravimetric PM >22 hrs
+PM_Data$duration_index = 1              
+PM_Data$duration_index[PM_Data$Duration<22] = 0
+
+#create an index for normal flow rate > 85% of time
+PM_Data$flow_index = 1                
+PM_Data$flow_index[PM_Data$flow28.good<0.85] = 0
+
+PM_Data$PM = ((PM_Data$netmass-0.005)*1000)/(as.numeric(PM_Data$vol)/(1000))     # gravimetric concentration
+PM_Data$CF =  PM_Data$PM/PM_Data$nephelometer_corr_avg       # gravimetric correction factor
+
+# create an index for gravimetric correction factor, 0 if no or problematic gravimetric PM, short duration, or out-of-range flow rate
+PM_Data$CF_index = 0              
+PM_Data$CF_index[!is.na(PM_Data$index) & PM_Data$index=="GOOD" & PM_Data$duration_index == 1 & PM_Data$flow_index == 1] = 1
+
+# read in gravimetric correction factor for each MicroPEM device , make sure filepath is correct
+GravimeticCF = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/GravimetricFactor.csv", header=TRUE)
+
+# if there is a problem on gravimetric PM sample, then use device correction factor for the nephelometer readings
+PM_Data$CF_new = PM_Data$CF
+for (i in 1: nrow(PM_Data)){
+  if (PM_Data$CF_index[i] == 0)  PM_Data$CF_new[i] = GravimeticCF$Ratio[GravimeticCF$MicroPEMID == as.character(PM_Data$deviceSerial.x[i])]
+}
