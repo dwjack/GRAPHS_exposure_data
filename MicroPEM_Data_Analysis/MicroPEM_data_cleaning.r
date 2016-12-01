@@ -726,3 +726,155 @@ PM_Data$CF_new = PM_Data$CF
 for (i in 1: nrow(PM_Data)){
   if (PM_Data$CF_index[i] == 0)  PM_Data$CF_new[i] = GravimeticCF$Ratio[GravimeticCF$MicroPEMID == as.character(PM_Data$deviceSerial.x[i])]
 }
+
+####################################DAILY PM DATA ###############################################
+DailyPM_Data = NULL   # create an empty data frame to store Daily PM data
+
+for (k in 1:nrow(PM_Data)) {
+  Data1 = convertOutput(PM_Data$participantID[k])  
+  Data2 = Data1$measures
+  Data4 = PM_Data[k,]       # Get PM summary statistics from PM_Data 
+  
+  Data3 = Data2[Data2$timeDate>=(Data4$starttime_new)&Data2$timeDate<=(Data4$endtime_new),]    #extract data during the measurement time   
+  Data5 = Data3[!is.na(Data3$nephelometer),]                                      #drop rows without nephelometer reading
+  Data6 = Data5[Data5$relativeHumidity>0 & Data5$relativeHumidity<100,]           #drop measurement with RH <=0 or RH>=100
+  
+  # HEPA correction
+  if(!is.na(Data4$HEPASt) & !is.na(Data4$HEPAEnd)) Data6$nephelometer_corr = Data6$nephelometer - seq(Data4$HEPASt, Data4$HEPAEnd, (Data4$HEPAEnd-Data4$HEPASt)/(length(Data6$nephelometer)-1))
+  if(!is.na(Data4$HEPASt) & is.na(Data4$HEPAEnd)) Data6$nephelometer_corr = Data6$nephelometer - Data4$HEPASt
+  if(is.na(Data4$HEPASt) & !is.na(Data4$HEPAEnd)) Data6$nephelometer_corr = Data6$nephelometer - Data4$HEPAEnd
+  if(is.na(Data4$HEPASt) & is.na(Data4$HEPAEnd)) Data6$nephelometer_corr = Data6$nephelometer
+  
+  #minute nephelometer data
+  Data6$unique_min <- floor_date(Data6$timeDate, unit = "minute")          
+  Data7 = ddply(Data6, .(unique_min), summarise,
+                nephelometer_min = mean(nephelometer), 
+                nephelometer_corr_min = mean(nephelometer_corr))
+  
+  Data7$nephelometer_final_min = Data7$nephelometer_corr_min*Data4$CF_new
+  Data4$nephelometer_avg = mean(Data7$nephelometer_min) 
+  Data4$nephelometer_corr_avg = mean(Data7$nephelometer_corr_min)
+  Data4$nephelometer_final_avg = mean(Data7$nephelometer_final_min)
+  
+  #minute accelerometer data  
+  Data3$unique_min <- floor_date(Data3$timeDate, unit = "minute")          
+  Data3$hours <- hour(Data3$timeDate)
+  Data8 = ddply(Data3, .(unique_min), summarise,
+                X.axis_mean = round(mean(as.numeric(xAxis), na.rm=TRUE), digits = 4), 
+                Y.axis_mean = round(mean(as.numeric(yAxis), na.rm=TRUE), digits = 4), 
+                Z.axis_mean = round(mean(as.numeric(zAxis), na.rm=TRUE), digits = 4), 
+                Vector.Sum.Composite_mean = round(mean(as.numeric(vectorSum), na.rm=TRUE), digits = 4), 
+                X.axis_SD = round(sd(xAxis, na.rm=TRUE), digits = 3), 
+                Y.axis_SD = round(sd(yAxis, na.rm=TRUE), digits = 3), 
+                Z.axis_SD = round(sd(zAxis, na.rm=TRUE), digits = 3), 
+                Vector.Sum.Composite_SD = round(sd(vectorSum, na.rm=TRUE), digits = 3),
+                hours = mean(hours)) 
+  
+  # define threshold and moving window for accelerometer data
+  compliance_threshold = 0.01               
+  window_width = 10                           
+  
+  # if no movement during the window (x minute centered in current minute), then the compliance in current minute is 0.
+  Data8$sd_composite <- round(rollapply(Data8$Vector.Sum.Composite_mean, width=window_width,  FUN = sd, align = "right", na.rm = TRUE, fill = NA), digits=3)
+  Data8$sd_X.axis <- round(rollapply(Data8$X.axis_mean, width=window_width,  FUN = sd, align = "right", na.rm = TRUE, fill = NA), digits=3)
+  Data8$sd_Y.axis <- round(rollapply(Data8$Y.axis_mean, width=window_width,  FUN = sd, align = "right", na.rm = TRUE, fill = NA), digits=3)
+  Data8$sd_Z.axis <- round(rollapply(Data8$Z.axis_mean, width=window_width,  FUN = sd, align = "right", na.rm = TRUE, fill = NA), digits=3)
+  
+  Data8$sd_above_threshold = ifelse(Data8$sd_X.axis > compliance_threshold|Data8$sd_Y.axis > compliance_threshold|Data8$sd_Z.axis > compliance_threshold, 1, 0)
+  Data8$sd_X_above_threshold = ifelse(Data8$sd_X.axis > compliance_threshold, 1, 0)    
+  Data8$sd_Y_above_threshold = ifelse(Data8$sd_Y.axis > compliance_threshold, 1, 0) 
+  Data8$sd_Z_above_threshold = ifelse(Data8$sd_Z.axis > compliance_threshold, 1, 0)  
+  
+  wakehour = c(7:22)   # define wake hour is between 7 am and 10 pm
+  
+  # divide the sampling period into 24 hour blocks 
+  Data4$PMday_1 = Data7$unique_min[1]
+  Data4$PMday_2 = Data4$PMday_1 + 24*60*60
+  Data4$PMday_3 = Data4$PMday_2 + 24*60*60
+  Data4$PMday4 = Data4$PMday_3 + 24*60*60
+  
+  Data4$Day_1 = 1
+  Data4$Day_2 = 2
+  Data4$Day_3 = 3
+  
+  # average of uncorrected nephelometer reading in each 24 hour
+  Data4$OldPM_1 = round(mean(Data7[Data7$unique_min>=Data4$PMday_1&Data7$unique_min<Data4$PMday_2,]$nephelometer_corr_min), digits=3)
+  Data4$OldPM_2 = round(mean(Data7[Data7$unique_min>=Data4$PMday_2&Data7$unique_min<Data4$PMday_3,]$nephelometer_corr_min), digits=3)
+  Data4$OldPM_3 = round(mean(Data7[Data7$unique_min>=Data4$PMday_3&Data7$unique_min<Data4$PMday4,]$nephelometer_corr_min), digits=3)
+  
+  # average of corrected nephelometer reading in each 24 hour
+  Data4$CorPM_1 = round(mean(Data7[Data7$unique_min>=Data4$PMday_1&Data7$unique_min<Data4$PMday_2,]$nephelometer_final_min), digits=3)
+  Data4$CorPM_2 = round(mean(Data7[Data7$unique_min>=Data4$PMday_2&Data7$unique_min<Data4$PMday_3,]$nephelometer_final_min), digits=3)
+  Data4$CorPM_3 = round(mean(Data7[Data7$unique_min>=Data4$PMday_3&Data7$unique_min<Data4$PMday4,]$nephelometer_final_min), digits=3)
+  
+  # number of nephelometer reading in each 24 hour
+  Data4$PMn_1 = nrow(Data7[Data7$unique_min>=Data4$PMday_1&Data7$unique_min<Data4$PMday_2,])
+  Data4$PMn_2 = nrow(Data7[Data7$unique_min>=Data4$PMday_2&Data7$unique_min<Data4$PMday_3,])
+  Data4$PMn_3 = nrow(Data7[Data7$unique_min>=Data4$PMday_3&Data7$unique_min<Data4$PMday4,])  
+  
+  # wearing compliance (% of time) in each 24 hour
+  Data4$compliance_1 = sum(Data8[Data8$unique_min>=Data4$PMday_1 & Data8$unique_min<Data4$PMday_2,]$sd_above_threshold, na.rm=T)
+  Data4$compliance_2 = sum(Data8[Data8$unique_min>=Data4$PMday_2 & Data8$unique_min<Data4$PMday_3,]$sd_above_threshold, na.rm=T)
+  Data4$compliance_3 = sum(Data8[Data8$unique_min>=Data4$PMday_3 & Data8$unique_min<Data4$PMday4,]$sd_above_threshold, na.rm=T)
+  
+  # wearing compliance (% of wake time) in each 24 hour
+  Data4$complianceWake_1 = sum(Data8[Data8$unique_min>=Data4$PMday_1 & Data8$unique_min<Data4$PMday_2 & Data8$hours %in% wakehour,]$sd_above_threshold, na.rm=T)
+  Data4$complianceWake_2 = sum(Data8[Data8$unique_min>=Data4$PMday_2 & Data8$unique_min<Data4$PMday_3 & Data8$hours %in% wakehour,]$sd_above_threshold, na.rm=T)
+  Data4$complianceWake_3 = sum(Data8[Data8$unique_min>=Data4$PMday_3 & Data8$unique_min<Data4$PMday4 & Data8$hours %in% wakehour,]$sd_above_threshold, na.rm=T)
+  
+  # accumulative PM averages for 24, 48, and 72 hour
+  Data4$PMAverage24=round(mean(Data7[Data7$unique_min>=Data4$PMday_1&Data7$unique_min<Data4$PMday_2,]$nephelometer_final_min), digits=3)
+  Data4$PMAverage48=round(mean(Data7[Data7$unique_min>=Data4$PMday_1&Data7$unique_min<Data4$PMday_3,]$nephelometer_final_min), digits=3)
+  Data4$PMAverage72=round(mean(Data7[Data7$unique_min>=Data4$PMday_1&Data7$unique_min<Data4$PMday4,]$nephelometer_final_min), digits=3)
+  
+  DailyPM_Data = rbind(DailyPM_Data, Data4)  # update dailyPM data frame
+  
+  if(round(k/50)*50==k)               
+    print(k)  
+}
+
+# save DailyPM dataset, please check the output directory
+saveRDS(DailyPM_Data, file = "/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/DailyPM.rds") 
+    
+##############################MERGE DAILYPM WITH MICROPEM LOG DATA#############################
+DailyPM = merge(DailyPM_Date, MicroPEM, by.x="filterID", by.y="filterid", all.x=T)
+DailyPM[which(is.na(DailyPM$mstudyid)),] # missing three MircoPEM logsheet  KHC0729, KHC1015, KHCD48C
+
+#####################################READ IN CO DATA############################################
+COdata = readRDS("/Users/zhengzhou/Dropbox/Ghana_exposure_data_SHARED_2014/CO_files_processed/FINAL_CO_parameters_withvalidation_2016Jun14.rds")
+COdata$Startdate = as.Date(COdata$firstdate)                                #get the start date of CO measurements
+COdata1 = COdata[is.na(COdata$cstudyid),]                                   #exclude child CO measurements  
+
+##########################MERGE PM AND CO DATA##########################################
+PMCO = merge(DailyPM, COdata1, by=c("mstudyid", "Startdate"), all.x=T)
+
+# change co colume names
+colnames(PMCO)[colnames(PMCO)=="co_day1_mean"] = "OldCO_1"
+colnames(PMCO)[colnames(PMCO)=="co_day2_mean"] = "OldCO_2"
+colnames(PMCO)[colnames(PMCO)=="co_day3_mean"] = "OldCO_3"
+
+colnames(PMCO)[colnames(PMCO)=="co_day1_mean_corr"] = "CorCO_1"
+colnames(PMCO)[colnames(PMCO)=="co_day2_mean_corr"] = "CorCO_2"
+colnames(PMCO)[colnames(PMCO)=="co_day3_mean_corr"] = "CorCO_3"
+    
+##############################WIDE TO LONG FORMAT#########################################
+PMCO1 <-reshape(PMCO, 
+                     varying=c(grep("PMday_",colnames(PMCO)),
+                               grep("OldPM_",colnames(PMCO)),
+                               grep("CorPM_",colnames(PMCO)),
+                               grep("compliance_",colnames(PMCO)),
+                               grep("complianceWake_",colnames(PMCO)),
+                               grep("PMn_",colnames(PMCO)),
+                               grep("OldCO_",colnames(PMCO)),
+                               grep("CorCO_",colnames(PMCO)),
+                               grep("Day_",colnames(PMCO))),
+                     idvar="id", 
+                     direction="long",  sep="_")
+
+PMCO2 = PMCO1[PMCO1$visually_valid!=3,]    # exclude samples with invalid CO readings
+PMCO2 = PMCO2[PMCO2$PMn>1320,]      #exclude PM sample-day < 22hrs
+PMCO2 = PMCO2[!is.na(PMCO2$CorCO),]  #exclude CO sample-day < 24hrs
+PMCO2 = PMCO2[PMCO2$CorPM>0,]       #exclude PM <0
+#calculate compliance measure and categorize the measure into 7 buckets
+PMCO2$complianceWakePct = PMCO2$complianceWake/PMCO2$PMn   
+PMCO2$complianceWakePctGP = cut(PMCO2$complianceWakePct, seq(0, 0.7, 0.1), labels=c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7), right=FALSE)
