@@ -452,7 +452,7 @@ QualityControl1 = QualityControl[order(QualityControl$filterID),]     # sort obs
 
 HEPAdata = NULL     # creat an empty data frame to store HEPA information
 
-# Define a directory to output fiugres
+# Define a directory to output figures pdf
 plotdirectory <- "/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/"    
 pdf(file = paste0(plotdirectory, "HEPAplot",".pdf"), height = 8, width = 8)
 par(mfrow = c(2,2))
@@ -530,13 +530,136 @@ dev.off()
 ##################################HEPA PERIOD IDENTIFICATION#########################
 # make sure the filepath is correct
 HEPAtime = readRDS("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/HEPAtime.rds") 
-
+# convert character into datetime format
 HEPAtime$HEPAsttime1 = mdy_hms(HEPAtime$HEPAsttime1,tz="GMT")
 HEPAtime$HEPAsttime2 = mdy_hms(HEPAtime$HEPAsttime2,tz="GMT")
 HEPAtime$HEPAendtime1 = mdy_hms(HEPAtime$HEPAendtime1,tz="GMT")
 HEPAtime$HEPAendtime2 = mdy_hms(HEPAtime$HEPAendtime2,tz="GMT")  
   
+#################################NEPHELOMETER SAMPLE SUMMARY######################################
+QualityControl2 = merge(QualityControl1, HEPAtime, by="filterID", all=T)  # merge MicroPEM settings with correct HEPA datetimes
+
+Nephelometer = NULL # create an empty data frame to store Nephelometer summary statistics
+
+# Define a directory to output figures pdf
+plotdirectory <- "/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/"
+pdf(file = paste0(plotdirectory, "ValidationPlot",".pdf"), height = 8, width = 8)
+par(mfrow = c(3,3))
+par(mar=c(2,2,3,1))
+
+for(k in 1:nrow(QualityControl2)){ 
+  Data1 = convertOutput(QualityControl2$participantID[k])
+  Data2 = Data1$measures
+  Data4 = QualityControl2[k,]
   
+  # create a variable for startdate of sampling and correct some MicroPEM system time errors
+  Data4$Startdate = as.Date(Data4$starttime_new)
+  Data4$Startdate[Data4$filterID=="KHC0271"] = as.Date("2014-01-01", TZ="GMT")  
+  Data4$Startdate[Data4$filterID=="KHC0272"] = as.Date("2014-01-01", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0273"] = as.Date("2014-01-01", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0274"] = as.Date("2014-01-01", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0277"] = as.Date("2014-01-01", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0278"] = as.Date("2014-01-01", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0279"] = as.Date("2014-01-01", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0280"] = as.Date("2014-01-01", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0281"] = as.Date("2014-01-01", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0398"] = as.Date("2014-03-17", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC0967"] = as.Date("2014-11-14", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC1269"] = as.Date("2015-02-19", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC1867"] = as.Date("2015-10-20", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHC1881"] = as.Date("2015-10-28", TZ="GMT")
+  Data4$Startdate[Data4$filterID=="KHCD103A"] = as.Date("2015-06-01", TZ="GMT")   
+  Data4$Startdate[Data4$filterID=="KHCD103B"] = as.Date("2015-06-11", TZ="GMT") 
+  
+  Data3 = Data2[Data2$timeDate>=(Data4$starttime_new)&Data2$timeDate<=(Data4$endtime_new),]      #rdata between start and end time of measurement
+  Data5 = Data3[!is.na(Data3$nephelometer),]                                      #drop rows without nephelometer readings
+  Data6 = Data5[Data5$relativeHumidity>0 & Data5$relativeHumidity<100,]           #drop measurement with RH <=0 or RH>=100
+
+  if(!is.na(Data4$HEPAsttime1) & !is.na(Data4$HEPAendtime1)){                     #calculate HEPA correction values
+    Start = Data6[Data6$timeDate>=(Data4$HEPAsttime1)&Data6$timeDate<=(Data4$HEPAsttime2),]         #start HEPA readings
+    End = Data6[Data6$timeDate>=(Data4$HEPAendtime1)&Data6$timeDate<=(Data4$HEPAendtime2),]         #end HEPA readings
+    Data4$HEPAstnumber = nrow(Start)              #number of readings in start HEPA                             
+    Data4$HEPAendnumber = nrow(End)               #number of readings in end HEPA
+    Data4$HEPASt = mean(Start$nephelometer, trim=1/Data4$HEPAstnumber)         #average reading in start HEPA excluding max and min readings
+    Data4$HEPAEnd = mean(End$nephelometer, trim=1/Data4$HEPAendnumber)         #average reading in end HEPA excluding max and min readings
+    # Apply HEPA correction to all nephelometer readings
+    Data6$nephelometer_corr = Data6$nephelometer - seq(Data4$HEPASt, Data4$HEPAEnd, (Data4$HEPAEnd-Data4$HEPASt)/(length(Data6$nephelometer)-1))       
+  } else if (!is.na(Data4$HEPAsttime1) & is.na(Data4$HEPAendtime1)) {          #if no start HEPA, then only end HEPA is used for correction
+    Start = Data6[Data6$timeDate>=(Data4$HEPAsttime1)&Data6$timeDate<=(Data4$HEPAsttime2),]
+    End = NA
+    Data4$HEPAstnumber = nrow(Start)
+    Data4$HEPAendnumber = NA
+    Data4$HEPASt = mean(Start$nephelometer, trim=1/Data4$HEPAstnumber)
+    Data4$HEPAEnd = NA
+    Data6$nephelometer_corr = Data6$nephelometer - Data4$HEPASt
+  } else if (is.na(Data4$HEPAsttime1) & !is.na(Data4$HEPAendtime1)) {          #if no end HEPA, then only start HEPA is used for correction
+    Start = NA
+    End = Data6[Data6$timeDate>=(Data4$HEPAendtime1)&Data6$timeDate<=(Data4$HEPAendtime2),]
+    Data4$HEPAstnumber = NA
+    Data4$HEPAendnumber = nrow(End)
+    Data4$HEPASt = NA
+    Data4$HEPAEnd = mean(End$nephelometer, trim=1/Data4$HEPAendnumber)
+    Data6$nephelometer_corr = Data6$nephelometer - Data4$HEPAEnd
+  } else if (is.na(Data4$HEPAsttime1) & is.na(Data4$HEPAendtime1)) {           #if no start and end HEPA, then no correction
+    Data4$HEPAstnumber = NA
+    Data4$HEPAendnumber = NA
+    Data4$HEPASt = NA
+    Data4$HEPAEnd = NA
+    Data6$nephelometer_corr = Data6$nephelometer
+  }
+  
+  Data6$unique_min <- floor_date(Data6$timeDate, unit = "minute")          #get minute from datetime
+  Data4$Duration = length(unique(Data6$unique_min))/60                     #duration of measurement
+  #average of raw and HEPA-corrected nephelometer readings  
+  Data7 = ddply(Data6, .(unique_min), summarise,                           
+                nephelometer_min = mean(nephelometer), 
+                nephelometer_corr_min = mean(nephelometer_corr))
+  
+  Data4$nephelometer_avg = mean(Data7$nephelometer_min) 
+  Data4$nephelometer_corr_avg = mean(Data7$nephelometer_corr_min)
+  
+  Data8 = Data3[!is.na(Data3$flow),]                                       #flow rate data
+  Data8$flow_cor = Data8$flow 
+  if(Data4$Startdate < as.Date(mdy("04/03/2014"))) {                       #adjust the date with flow meter backward issue
+    Data8$flow_cor = Data8$flow*0.8211 - 0.0139
+  }     
+  Data8 = Data8[Data8$shutDownReason!="Flow blocked 1",]                   #drop rows with flow blocked note
+  Data8$unique_min <- floor_date(Data8$timeDate, unit = "minute")          
+  
+  Data9 = ddply(Data8, .(unique_min), summarise,                           #get minute flow rate
+                Flow = round(max(as.numeric(flow_cor), na.rm=TRUE), digits = 3))
+  
+  Data4$vol = sum(Data9$Flow, na.rm=T)/2                                   #calculate total air volume of sampling
+  Data4$vol[levels(Data4$filterID)=="KHC0100"] = sum(Data9$Flow, na.rm=T)  #correct volume for KHC0100 which is always on
+  Data4$flow.avg = mean(Data9$Flow, na.rm=T)
+  Data4$flow.sd = sd(Data9$Flow, na.rm=T)
+  Data4$flow.min = min(Data9$Flow, na.rm=T)
+  Data4$flow.max = max(Data9$Flow, na.rm=T)
+  # percent of time that flow rate is between 0.28 and 0.55 LPM
+  Data4$flow28.good = sum(ifelse(Data9$Flow<= 0.55 & Data9$Flow >= 0.28, 1, 0), na.rm=T)/nrow(Data9) 
+  # percent of time that flow rate is between 0.30 and 0.55 LPM
+  Data4$flow30.good = sum(ifelse(Data9$Flow<= 0.55 & Data9$Flow >= 0.30, 1, 0), na.rm=T)/nrow(Data9)
+  Data4$Negative1 = length(which(Data6$nephelometer< (-10)))/nrow(Data6)        #calculate percent of negative readings in raw data
+  Data4$Negative2 = length(which(Data6$nephelometer_corr< (-10)))/nrow(Data6)   #calculate percent of negative readings in HEPA-corrected data
+  
+  Nephelometer = rbind(Nephelometer, Data4)  # update Nephelometer data frame
+  
+  #plots of nephelometer readings which are used for visual validation
+  title <- paste(Data4$filterID, Data4$deviceSerial, format(Data4$Startdate, format = "%b %d %Y"), "Duration=", round(Data4$Duration), 
+                 "\n StHEPA=", round(Data4$HEPASt), "EndHEPA=",round(Data4$HEPAEnd), "mean=", round(Data4$nephelometer_avg),  "Adj_m=", round(Data4$nephelometer_corr_avg), 
+                 "\n Neg1=", round(Data4$Negative1, digit=3), "Neg2=", round(Data4$Negative2, digit=3))
+  plot(Data6$timeDate, Data6$nephelometer, type = "l",  main = "" , xlab="", ylab = "", ylim=c(-100,500), lwd = 2, col = "blue")
+  abline(h=0, col="grey")
+  if (Data4$Negative2>= 0.2) lines(Data6$timeDate, Data6$nephelometer_corr, col = alpha("red",0.6), lwd = 2)
+  if (Data4$Negative2< 0.2) lines(Data6$timeDate, Data6$nephelometer_corr, col = alpha("black", 0.6), lwd = 2)
+  
+  if (Data4$Negative2>= 0.2) title(main = title,  cex.main = 0.7, col.main = "red") 
+  if (Data4$Negative2< 0.2) title(main = title,  cex.main = 0.7, col.main = "black") 
+  
+  if(round(k/50)*50==k)               
+    print(k) 
+}
+dev.off()   
   
   
   
