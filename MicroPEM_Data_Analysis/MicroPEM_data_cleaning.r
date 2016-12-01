@@ -875,6 +875,9 @@ PMCO2 = PMCO1[PMCO1$visually_valid!=3,]    # exclude samples with invalid CO rea
 PMCO2 = PMCO2[PMCO2$PMn>1320,]      #exclude PM sample-day < 22hrs
 PMCO2 = PMCO2[!is.na(PMCO2$CorCO),]  #exclude CO sample-day < 24hrs
 PMCO2 = PMCO2[PMCO2$CorPM>0,]       #exclude PM <0
-#calculate compliance measure and categorize the measure into 7 buckets
+# calculate compliance measure and categorize the measure into 7 buckets
 PMCO2$complianceWakePct = PMCO2$complianceWake/PMCO2$PMn   
 PMCO2$complianceWakePctGP = cut(PMCO2$complianceWakePct, seq(0, 0.7, 0.1), labels=c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7), right=FALSE)
+
+# save PMCO data frame as a Rdata
+saveRDS(PMCO2, file = "/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/PMCO.rds") 
