@@ -667,10 +667,13 @@ Validation = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana P
     
 table(Validation$Validity)    # frequency of visual validity
 
-Nephelometer1 = merge(Nephelometer, Validation , by="filterID", all=T)          # add nephelometer validation data
-Nephelometer1$Harmattan = 0                                                            #Harmattan indicator
+# merge nephelometer summary statistics with visual validation index
+Nephelometer1 = merge(Nephelometer, Validation , by="filterID", all=T) 
+# create an indicator for Harmattan
+Nephelometer1$Harmattan = 0                                                            
 Nephelometer1$Harmattan[Nephelometer1$Note=="elevated baseline"] = 1
-table(Nephelometer1$Note, Nephelometer1$Validity)
-Nephelometer2 = Nephelometer1[Nephelometer1$Validity!=4,]         # drop samples with invalid nephelometer data
+
+# drop samples with invalid nephelometer data
+Nephelometer2 = Nephelometer1[Nephelometer1$Validity!=4,]
   
   
