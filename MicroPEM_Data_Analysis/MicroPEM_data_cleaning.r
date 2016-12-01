@@ -661,6 +661,16 @@ for(k in 1:nrow(QualityControl2)){
 }
 dev.off()   
   
-  
+##################################NEPHELOMETER VALIDATION#########################
+#read in validation index of nephelometer data
+Validation = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/VisualizedValidation.csv", header=TRUE)    
+    
+table(Validation$Validity)    # frequency of visual validity
+
+Nephelometer1 = merge(Nephelometer, Validation , by="filterID", all=T)          # add nephelometer validation data
+Nephelometer1$Harmattan = 0                                                            #Harmattan indicator
+Nephelometer1$Harmattan[Nephelometer1$Note=="elevated baseline"] = 1
+table(Nephelometer1$Note, Nephelometer1$Validity)
+Nephelometer2 = Nephelometer1[Nephelometer1$Validity!=4,]         # drop samples with invalid nephelometer data
   
   
