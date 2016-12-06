@@ -1,15 +1,16 @@
 ################################# FIND THE DATA FILES ############################################ 
 # define a file directory
 filedirectory <- "/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPem Raw Data/Nephelometer_processed_correct"
-Datafiles = list.files(filedirectory,full.names = TRUE)           # grab all MicroPEM files in the directory
+Datafiles = list.files(filedirectory,full.names = TRUE)           # grab all MicroPEM files in the directory; includes both data as downloaded in Ghana and some RTI corrected files (RH issue)
 
 # find files with no nephelometer reading
-excludelist <- c("KHC0234")                                       
+excludelist <- c("KHC0234")   # bad file, contains no data.                                    
 excludefiles <- Datafiles[unlist(sapply(excludelist, function(x) grep(x, Datafiles)))] 
 Datafiles <- Datafiles[!(Datafiles %in% excludefiles)]            # removes empty files with no nephelometer reading
 MicroPEMfiles <- as.data.frame(Datafiles)                         # create a dataframe of datafiles
 
 ######################## DEFINE A FUNCTION TO READ AND STORE MICROPEM RAW FILE####################
+# for each microPEM file, creates 2 matrices:  (i) setting parameters; (ii) time varying measurements
 require(dplyr)
 require(akima)
 require(lubridate)
@@ -276,8 +277,9 @@ return(microPEMObject)
 }
 
 ###################################CHECK MICROPEM SETTINGS################################
-QualityControl = NULL                           # creat an empty data frame to store MicroPEM setting and basic summary information
-
+QualityControl = NULL                           # create an empty data frame to store MicroPEM setting and basic summary information
+# each row in QualityControl will represent one microPEM session
+  
 for(k in 1:nrow(MicroPEMfiles)){ 
   Data1 = convertOutput(as.character(MicroPEMfiles$Datafiles[k]))             # use the defined function convertOutput to readin MicroPEM raw file
   Data2 = Data1$measures                                                      # extract all time-varying variables 
@@ -344,6 +346,8 @@ QualityControl = QualityControl[as.numeric(QualityControl$humiditySlope)<=1 & as
 QualityControl = QualityControl[as.numeric(QualityControl$humidityOffset)>-8 & as.numeric(QualityControl$humidityOffset)<10,]  # correct humidityOffset is between -5 and 5
 
 ##################################CORRECT WRONG DATETIME##########################
+  # correcting errors that Zheng identified manually (by inspection)
+  
 QualityControl$starttime_new = QualityControl$starttime
 QualityControl$endtime_new = QualityControl$endtime
 
@@ -447,6 +451,8 @@ which(MicroPEM$filterid=="KHC031B")
 MicroPEM$filterid[MicroPEM$filterid=="KHC031B"] = "KHCD31B"           
 
 ##################################IDENTIFY HEPA CHANGEPOINT###################################
+  # generate plots of nephalometer time series for visual inspection (plots first 100 and last 100 observations)
+  # note use of package "changepoint"
 require(changepoint)
 QualityControl1 = QualityControl[order(QualityControl$filterID),]     # sort observation by filterID
 
@@ -528,6 +534,7 @@ for(k in 1:nrow(QualityControl1)){
 dev.off()
 
 ##################################HEPA PERIOD IDENTIFICATION#########################
+  # To generate HEPAtime.rds, Zheng visually inspected the plots crated by cpt.meanvar -- if he detected errors, he manually updated HEPAdata, then renamed HEPAdata as HEPAtime.rds 
 # make sure the filepath is correct
 HEPAtime = readRDS("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/HEPAtime.rds") 
 # convert character into datetime format
@@ -546,7 +553,7 @@ plotdirectory <- "/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Projec
 pdf(file = paste0(plotdirectory, "ValidationPlot",".pdf"), height = 8, width = 8)
 par(mfrow = c(3,3))
 par(mar=c(2,2,3,1))
-
+# loop over microPEM files to apply HEPA correction
 for(k in 1:nrow(QualityControl2)){ 
   Data1 = convertOutput(QualityControl2$participantID[k])
   Data2 = Data1$measures
@@ -620,8 +627,8 @@ for(k in 1:nrow(QualityControl2)){
   
   Data8 = Data3[!is.na(Data3$flow),]                                       #flow rate data
   Data8$flow_cor = Data8$flow 
-  if(Data4$Startdate < as.Date(mdy("04/03/2014"))) {                       #adjust the date with flow meter backward issue
-    Data8$flow_cor = Data8$flow*0.8211 - 0.0139
+  if(Data4$Startdate < as.Date(mdy("04/03/2014"))) {                       #adjust the data with flow meter backward issue
+    Data8$flow_cor = Data8$flow*0.8211 - 0.0139                             # manual correction from Steve Chillrud
   }     
   Data8 = Data8[Data8$shutDownReason!="Flow blocked 1",]                   #drop rows with flow blocked note
   Data8$unique_min <- floor_date(Data8$timeDate, unit = "minute")          
@@ -727,7 +734,7 @@ for (i in 1: nrow(PM_Data)){
   if (PM_Data$CF_index[i] == 0)  PM_Data$CF_new[i] = GravimeticCF$Ratio[GravimeticCF$MicroPEMID == as.character(PM_Data$deviceSerial.x[i])]
 }
 
-####################################DAILY PM DATA ###############################################
+####################################DAILY PM AVERAGE DATA ###############################################
 DailyPM_Data = NULL   # create an empty data frame to store Daily PM data
 
 for (k in 1:nrow(PM_Data)) {
