@@ -535,7 +535,7 @@ dev.off()
 
 ##################################HEPA PERIOD IDENTIFICATION#########################
   # To generate HEPAtime.rds, Zheng visually inspected the plots crated by cpt.meanvar -- if he detected errors, he manually updated HEPAdata, then renamed HEPAdata as HEPAtime.rds 
-# make sure the filepath is correct
+# make sure the filepath is correct; note that this data file is also availble in the github directory.
 HEPAtime = readRDS("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/HEPAtime.rds") 
 # convert character into datetime format
 HEPAtime$HEPAsttime1 = mdy_hms(HEPAtime$HEPAsttime1,tz="GMT")
@@ -669,9 +669,9 @@ for(k in 1:nrow(QualityControl2)){
 dev.off()   
   
 ##################################NEPHELOMETER VALIDATION#########################
-# read in validation index of nephelometer data
+# read in validation index of nephelometer data; also available in the github directory
 Validation = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/VisualizedValidation.csv", header=TRUE)    
-    
+# this contains the results of Zheng's visual inspection of the data.    
 table(Validation$Validity)    # frequency of visual validity
 
 # merge nephelometer summary statistics with visual validation index
@@ -684,7 +684,7 @@ Nephelometer1$Harmattan[Nephelometer1$Note=="elevated baseline"] = 1
 Nephelometer2 = Nephelometer1[Nephelometer1$Validity!=4,]
   
 #################################GRAVIMETRIC SAMPLE DATA ########################################
-# read in gravimetric PM data, make sure filepath is correct
+# read in gravimetric PM data, make sure filepath is correct; also in github
 GravimetricPM = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/FilterWeight.csv", header=TRUE,stringsAsFactors=FALSE)   
 
 Damagedfilter = c("GN012", "GN016", "GN019", "GN020", "GN021", "GN022", "GN025", "GN028", "GN030", "GN031", "GN032", "GN033",
@@ -725,7 +725,7 @@ PM_Data$CF =  PM_Data$PM/PM_Data$nephelometer_corr_avg       # gravimetric corre
 PM_Data$CF_index = 0              
 PM_Data$CF_index[!is.na(PM_Data$index) & PM_Data$index=="GOOD" & PM_Data$duration_index == 1 & PM_Data$flow_index == 1] = 1
 
-# read in gravimetric correction factor for each MicroPEM device , make sure filepath is correct
+# read in gravimetric correction factor for each MicroPEM device , make sure filepath is correct; also in github directory
 GravimeticCF = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/GravimetricFactor.csv", header=TRUE)
 
 # if there is a problem on gravimetric PM sample, then use device correction factor for the nephelometer readings
