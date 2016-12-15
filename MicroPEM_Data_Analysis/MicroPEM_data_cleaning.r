@@ -725,7 +725,35 @@ PM_Data$CF =  PM_Data$PM/PM_Data$nephelometer_corr_avg       # gravimetric corre
 PM_Data$CF_index = 0              
 PM_Data$CF_index[!is.na(PM_Data$index) & PM_Data$index=="GOOD" & PM_Data$duration_index == 1 & PM_Data$flow_index == 1] = 1
 
-# read in gravimetric correction factor for each MicroPEM device , make sure filepath is correct; also in github directory
+####################################PLOT GRAVIMETRIC VS NEPHELOMETER#######################################
+#subset the dataset for CF estimation for each MicroPEM
+PM_Data1 = PM_Data[!is.na(PM_Data$index) & PM_Data$index=="GOOD" & PM_Data$duration_index == 1 & PM_Data$flow_index == 1,]  
+summary(PM_Data1$CF[PM_Data1$Harmattan==0])
+summary(PM_Data1$CF[PM_Data1$Harmattan==1])
+
+plotdirectory <- "/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/"
+pdf(file = paste0(plotdirectory, "PMcomparison.pdf"), height = 8, width = 8)
+par(mfrow = c(3,3))
+par(mar=c(4,4,3,1))
+
+for (i in 1:length(unique(as.character(PM_Data1$deviceSerial.x)))) {
+  McPEMID = unique(as.character(PM_Data1$deviceSerial.x))[i]
+  filesbySN <- PM_Data1[PM_Data1$deviceSerial.x==McPEMID,]
+  filesbySN0 = filesbySN[filesbySN$Harmattan==0,]
+  filesbySN1 = filesbySN[filesbySN$Harmattan==1,]
+  reg = lm(filesbySN0$PM~filesbySN0$nephelometer_corr_avg+0)
+  plot(filesbySN0$PM~filesbySN0$nephelometer_corr_avg, xlim=c(0,350), ylim=c(0,350), xlab=expression(paste("Nephelometer (", mu,"g/", m^{3},')')), 
+       ylab=expression(paste("Gravimetric (", mu,"g/", m^{3},')')), col="blue")
+  points(filesbySN1$PM~filesbySN1$nephelometer_corr_avg, col="red")
+  abline(reg)
+  title(main = McPEMID,  cex.main = 1) 
+  legend('right', 'bottom', c(paste("H", "(", nrow(filesbySN1), ")"), paste("Non-H", "(", nrow(filesbySN0), ")")), col=c("red", "blue"), pch=1)
+}
+dev.off() 
+    
+##################################OBTAIN GRAVIMETRIC CORRECTION FACTOR#####################################   
+# read in gravimetric correction factor for each MicroPEM device , make sure filepath is correct
+
 GravimeticCF = read.csv("/Volumes/My Passport for Mac/WD passport/Columbia-Ghana Project/MicroPEM_Data/GravimetricFactor.csv", header=TRUE)
 
 # if there is a problem on gravimetric PM sample, then use device correction factor for the nephelometer readings
