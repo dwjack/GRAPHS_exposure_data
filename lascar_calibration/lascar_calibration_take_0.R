@@ -7,28 +7,52 @@ require(dplyr)
 require(ggplot2)
 require(lubridate)
 require(scales)
+library(lattice)
+
+# functions
+lascar.import <- function(x){
+  dt <- read.csv(x, stringsAsFactors=F, header=T)[,c(2,3,4)]
+  names(dt) <- c('datetime','co','SN')
+  dt$datetime <- dmy_hms(dt$datetime, tz="GMT")
+  dt$SN<-dt$SN[1]
+  dt
+}
+
+## Previously calculated: through Jan 11, 2015
+calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allJan13.csv", stringsAsFactors = FALSE)
+
+# actually at least plotted them thru Feb 9, 2015...but not validated based on this
+
+previous <- readRDS("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration Factors/Datasets/calib_factors_bymonth_Jan26.rds") # merged by SN, not interpolated
+
+# New dates to do: 
+# 17Jan15 second cali
+# 28Jan2015_1 THROUGH _2 
+# 30Jan2015_1 through _2 
+# 31Jan2015 
+# 02Feb2015_1 through _4
+# 09Feb2015_1 through _2
+# 27Jun2015_1 through _2
+# 30Jun2015
+# 17Nov2015
 
 ###### 
 # Original runs -------
 ###############################################
 #enter file to examine (calibration run)
 ###############################################
-run <- "09Feb2015_2"   
+run <- "17Nov2015"   
 ###############################################
 ###############################################
 
 path<-paste("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/", run, sep="")
 path
 files<-list.files(path,full.names=T, recursive = FALSE, include.dirs = FALSE)
-length(files)
+length(files) # one run is max 12*3 = 36 files?
 
-lascar.import <- function(x){
-    dt <- read.csv(x, stringsAsFactors=F, header=T)[,c(2,3,4)]
-    names(dt) <- c('datetime','co','SN')
-    dt$datetime <- dmy_hms(dt$datetime, tz="GMT")
-    dt$SN<-dt$SN[1]
-    dt
-}
+files <- files[which(regexpr("ogsheet", files) == -1)] # get rid of logsheets
+length(files) # one run is max 12*3 = 36 files?
+
 names(files)<-basename(files)
 calib <- ldply(files,lascar.import)
 
@@ -40,10 +64,13 @@ lascar_match<-regexpr(lascar_pattern, calib$.id)
 calib$lascar<-regmatches(calib$.id, lascar_match)
 
 
-# calib<-calib%.%filter(co<80) # why?
-
 ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line() + ggtitle(run)
 
+# lattice plot to check individual plots
+xyplot(co ~ datetime|lascar, data=calib, type='l')
+
+
+# save plot
 pdf(file = paste0("Calib_plot_", run, ".pdf"))
 ggplot(calib,aes(x=datetime,y=co,colour=lascar))+geom_line() + ggtitle(run)
 dev.off()
@@ -58,33 +85,49 @@ meantime #table for inspection
 # CHECK PLOT AND MEANTIME AND PROCEED VIA EYEBALL
 #################################################
 
-
+p <- meantime[meantime$datetime > as.POSIXct("2015-06-27 10:11", origin = "1970-1-1", tz = "GMT"),]
+p[order(p$lascar),]
 
 # ###############################################
 # # drop any problem records and replot
 # ###############################################
 # 
+# for Jan 28_1
+calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-28 10:30:00", origin = "1970-1-1", tz = "GMT"),]
 
-calib_cleaned <- calib
+# for Jan 28_2
+calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-28 14:00:00", origin = "1970-1-1", tz = "GMT"),]
 
-calib_cleaned <- calib %.% filter(lascar!="CU_CO_112") 
+# for Jan 30_1
+calib_cleaned <- calib[calib$datetime > as.POSIXct("2015-01-30 12:35:00", origin = "1970-1-1", tz = "GMT"),]
+
+calib_cleaned <- calib %.% filter(lascar!="CU_CO_154" & lascar!= "CU_CO_152") 
 # Mar 3_1: 114,  
 # Mar-3_2 112, 020 (there are two called 020). 
 # Mar 11: 114, 126 
 # Jul 5: 114. 
 # Nov 28: 114. 
+# Jun272015_1: 056
+# Jun272015_2: 154, 152
 
-calib_cleaned <- calib_cleaned %.% filter(lascar!="CU_CO_126") #repeat this row to remove additonal units from the plot
-# calib_cleaned <- calib_cleaned %.% filter(lascar!="CU_CO_156") #repeat this row to remove additonal units from the plot
+#repeat this row to remove additonal units from the plot
+
 # 
 ggplot(calib_cleaned,aes(x=datetime,y=co,colour=lascar))+geom_line()
 
-
+xyplot(co ~ datetime|lascar, data=calib_cleaned, type='l')
 
 ### if needed, get rid of weird spikes & replot (set the > & < values by eyeball)-----
 calib_cleaned <- calib_cleaned %.% filter(co > 38 & co <55)
 
 ggplot(calib_cleaned,aes(x=datetime,y=co,colour=lascar))+geom_line()+scale_x_datetime(breaks = date_breaks("min"), labels = date_format("%H:%M"))
+
+
+####################################
+# if no problems
+###################################
+
+calib_cleaned <- calib
 
 ####################################
 ### select the "middle" 5-10 minute section of the plateau by eyeball or by referring to times on logsheets-----
@@ -108,11 +151,25 @@ calib_cleaned$datetime[1]
 # Dec 22: this session with 4 lascars doesn't look normal (3 recorded no CO, the one that recorded is very spiky)
 # Jan 11: "2015-01-11 09:17" / "2015-01-11 09:25"
 # Jan 17: "2015-01-17 08:40"/ "2015-01-17 08:48"
+# Jan 28_1: "2015-01-28 10:42" / "2015-01-28 10:48"
+# Jan 28_2: "2015-01-28 14:15" / "2015-01-28 14:16"
+# Jan 30_1: "2015-01-30 12:50"/ "2015-01-30 12:52"
+# Jan 30_2: "2015-01-30 13:54"/ "2015-01-30 14:00"
+# Jan 31: "2015-01-31 12:16" / "2015-01-31 12:21"
+# Feb 02_1: "2015-02-02 10:41"/ "2015-02-02 10:44"
+# Feb 02_2: "2015-02-02 11:08"/ "2015-02-02 11:12"
+# Feb 02_3: "2015-02-02 11:33"/ "2015-02-02 11:38"
+# Feb 02_4: "2015-02-02 11:59"/ "2015-02-02 12:01"
 # Feb 09_1: "2015-02-09 09:47"/ "2015-02-09 09:51"
 # Feb 09_2: "2015-02-09 11:19"/ "2015-02-09 11:23"
+# Jun27_1: "2015-06-27 10:13" / "2015-06-27 10:18"
+# Jun27_2: "2015-06-27 14:45" / "2015-06-27 14:51"
+# Jun30: "2015-06-30 11:15" / "2015-06-30 11:18"
+# Nov 17: "2015-11-17 10:32" / "2015-11-17 10:37"
 
-starttime <- "2015-02-09 11:19"
-stoptime <- "2015-02-09 11:23"
+
+starttime <-"2015-11-17 10:32"
+stoptime <- "2015-11-17 10:37"
 
 calib_factor<- calib_cleaned %.% filter(datetime > ymd_hm(starttime, tz = "GMT") & datetime < ymd_hm(stoptime, tz = "GMT"))
 
@@ -126,10 +183,17 @@ dev.off()
 calib_factor <- calib_factor %.% group_by(lascar) %.% dplyr::summarise(co = mean(co), factor = round(co/50, digits = 3))
 
 
-### name columns and create a date-stamped data frame ----
+###################################################
+### choose a date
+###################################################
+date <-  format(dmy(run, tz = "GMT"), format = "%Y%b%d") # for any dates with only one run
+# date <- "2015Feb02_3" # For eg  March 03 and Dec 01 when there were 2 runs
 
-# date <-  format(dmy(run, tz = "GMT"), format = "%b%d") # for any dates with only one run
-date <- "Feb09_2" # For eg  March 03 and Dec 01 when there were 2 runs
+
+
+#name columns and create a date-stamped data frame ----
+
+
 
 names(calib_factor) <- c("lascar", paste0("co_", date), paste0("factor_", date))
 calib_factor$lascar <- gsub("CU_C0", "CU_CO", calib_factor$lascar)
@@ -152,23 +216,24 @@ assign(paste0("calib_factor_", date),calib_factor)
 # If adding to a previously established file
 ########################
 
-calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Calibration plots/calib_factor_allDec01.csv", stringsAsFactors = FALSE)
+calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allJan13.csv", stringsAsFactors = FALSE)
 
-calib_factor_all <- join_all(list(calib_factor_all, calib_factor_Jan11), by = "lascar", type = "full")
+calib_factor_all <- join_all(list(calib_factor_all, calib_factor_2015Jan17, calib_factor_2015Jan28_1, calib_factor_2015Jan28_2, calib_factor_2015Jan30_1, calib_factor_2015Jan30_2, calib_factor_2015Jan31, calib_factor_2015Feb02_1, calib_factor_2015Feb02_2, calib_factor_2015Feb02_3, calib_factor_2015Feb02_4, calib_factor_2015Feb09_1, calib_factor_2015Feb09_2, calib_factor_2015Jun27_1, calib_factor_2015Jun27_2, calib_factor_2015Jun30), by = "lascar", type = "full")
 
-calib_factor_all$lascar <- gsub("CU_C0", "CU_CO", calib_factor_all$lascar)
 
 
 ########################
 
+calib_factor_all$lascar <- gsub("CU_C0", "CU_CO", calib_factor_all$lascar)
 calib_factor_all <- calib_factor_all[order(calib_factor_all$lascar),]
 
 
 write.csv(calib_factor_all, file = paste0("calib_factor_all", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
 
+# stopped here Oct 6
 
 ### split out the calibration factors
-calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/calib_factor_allJan13.csv")
+calib_factor_all <- read.csv("/Users/ashlinn/Dropbox/Ghana project/BP project/Baseline BP Paper/Ghana BP R Materials/calib_factor_allOct06.csv")
 factor_variables <- regmatches(names(calib_factor_all), regexpr("factor_.*", names(calib_factor_all)))
 
 calib_factors <- calib_factor_all[,colnames(calib_factor_all) %in% c("lascar", factor_variables)]
@@ -195,6 +260,8 @@ calib_factors_ordered <- calib_factors[order(calib_factors$lascar),]
 
 
 ## Add SNs to calib_factors_ordered
+#### DO this if need to generate new SNs, otherwise skip
+# Need to start with a  CO_stacked files file.
 
 files <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_files_processed/12Dec2014/CO_stacked files/")
 length(files)
@@ -223,6 +290,8 @@ for (i in 1:nrow(test_table)) {
 
 Lascar_SN_to_ID <- test_table
 write.csv(Lascar_SN_to_ID, file = "Lascar_SN_to_ID.csv", row.names = FALSE)
+
+######### skip to here
 
 Lascar_SN_to_ID <- read.csv("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/CO_calibration_files/Lascar_SN_to_ID.csv", stringsAsFactors = FALSE)
 

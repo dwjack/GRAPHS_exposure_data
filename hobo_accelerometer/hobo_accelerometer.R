@@ -4,6 +4,11 @@ require(plyr)
 require(dplyr)
 require(zoo)
 
+ECM <- paste0("ECMF", c("01", "02", "18", "19", "20", "26", "27", "28", "29", "30"))
+Lascar <- paste0("ECMF",c("08", "09", "10", "16", "17", "21", "22", "23", "24", "25"))
+MicroPEM <- paste0("ECMF", c("03", "04", "05", "06", "07", "11", "12", "13", "14", "15"))
+
+
 # ECM pilot HOBO files: /Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/ECM_Pilot/Feasibility Pilot/HOBO Accelerometer data/
 files <- list.files("/Users/ashlinn/Dropbox/Ghana_exposure_data_SHARED (1)/ECM_Pilot/Feasibility Pilot/HOBO Accelerometer data/", pattern = ".csv", recursive=F, full.names=T) 
 length(files) 
@@ -33,7 +38,7 @@ hobo_import <- function(file) {
 
   
   # average it per 3 minutes
-  grouped_data <- data %.% group_by(three_minutes) %.% dplyr:: summarise(file = basename(file), SN = SN[1],log_interval_s = log_interval_s[1], mean_vectorsum_g = mean(vectorsum_g, na.rm = TRUE), sd_vectorsum_g = sd(vectorsum_g, na.rm = TRUE), sd_vectorsum_squared = sd(centered_vectorsum_squared, na.rm = TRUE))
+  grouped_data <- data %>% group_by(three_minutes) %>% dplyr:: summarise(file = basename(file), SN = SN[1],log_interval_s = log_interval_s[1], mean_vectorsum_g = mean(vectorsum_g, na.rm = TRUE), sd_vectorsum_g = sd(vectorsum_g, na.rm = TRUE), sd_vectorsum_squared = sd(centered_vectorsum_squared, na.rm = TRUE))
   grouped_data$three_minutes <- as.POSIXct(grouped_data$three_minute, origin = "1970-1-1", tz = "GMT")
  
   
@@ -52,24 +57,33 @@ stacked_files <- unique(hobo_stacked$file)
 
 width <- 5 # setting a 15-minute (3*5) window for calculating the rolling average
 
-pdf(file = paste0("HOBO_accel_data_",format(Sys.Date(), format = "%b%d"), ".pdf"), width = 10, height = 10)
+# pdf(file = paste0("HOBO_accel_data_",format(Sys.Date(), format = "%b%d"), ".pdf"), width = 10, height = 10)
 par(mfrow = c(2,2))
 hours_summary <- data.frame()
+compliance_data <- data.frame()
 for (i in 1:length(stacked_files)) {
   plotdata <- hobo_stacked[hobo_stacked$file == stacked_files[i],]
   compliance_threshold <- ifelse(plotdata$log_interval_s[1] == 30, 0.002, 0.001) # set compliance threshold to 0.002 for 30-second logging and 0.001 for 10-second logging
   plotdata$sd_above_threshold <- ifelse(plotdata$sd_vectorsum_squared > compliance_threshold, 1, 0)
   plotdata$sd_rollmean <- as.numeric(rollapply(plotdata$sd_above_threshold, width=width,  FUN = mean, align = "center", na.rm = TRUE, fill = NA)) 
   plotdata$compliance_rollmean <- ifelse(plotdata$sd_rollmean > 0, 1, 0)
-  plotdata$percent_compliant <- mean(plotdata$compliance_rollmean, na.rm = TRUE) # % of time
-  
-  hours_worn <- round(as.numeric(difftime(last(plotdata$three_minutes),first(plotdata$three_minutes), units = "hours")*plotdata$percent_compliant[1]), digits = 1)
+  percent_compliant <- mean(plotdata$compliance_rollmean, na.rm = TRUE) # % of time
+  duration <- as.numeric(difftime(max(plotdata$three_minutes), min(plotdata$three_minutes), unit = "hours"))
+  hours_worn <- round(as.numeric(difftime(last(plotdata$three_minutes),first(plotdata$three_minutes), units = "hours")*percent_compliant), digits = 1)
   hours_summary[i,1] <- plotdata$file[i]
   hours_summary[i,2] <- hours_worn
-  hours_summary[i,3] <- round(plotdata$percent_compliant[1]*100, digits = 1)
+  hours_summary[i,3] <- round(percent_compliant[1]*100, digits = 1)
+  hours_summary[i,4] <- duration
+  hours_summary[i,5] <- round((hours_worn/16)*100, digits = 1)
+  
+  compliance_data <- rbind(compliance_data, plotdata)
+  
+  studyid <- substr(hours_summary[i,1], start = regexpr("ECMF", hours_summary[i,1] ), stop = regexpr("ECMF", hours_summary[i,1] ) + 5)
+  
+  unit_type <- ifelse(studyid %in% ECM, "ECM", ifelse(studyid %in% Lascar, "Lascar", NA))
   
   # the plot
-  plot(plotdata$three_minutes, plotdata$mean_vectorsum_g, type = "l", ylim = c(0, max(plotdata$mean_vectorsum_g)), main = paste(plotdata$file[1], "\n Compliance Threshold =", compliance_threshold, "Window =", width*3, "minutes \n Logger interval =", plotdata$log_interval_s[1], "s, Percent compliant = ", round(plotdata$percent_compliant[1]*100, digits = 1), ", Hours worn =", hours_worn), cex.main = 0.8, ylab = "mean vector sum (g force)", xlab = "", xaxt = "n")
+  plot(plotdata$three_minutes, plotdata$mean_vectorsum_g, type = "l", ylim = c(0, max(plotdata$mean_vectorsum_g)), main = paste(unit_type, studyid, "\n Compliance Threshold =", compliance_threshold, "Window =", width*3, "minutes \n Logger interval =", plotdata$log_interval_s[1], "s, Duration = ", round(duration, digits = 1), ", Hours worn =", hours_worn), cex.main = 0.8, ylab = "mean vector sum (g force)", xlab = "", xaxt = "n")
   lines(plotdata$three_minutes, plotdata$compliance_rollmean/1.5, col = "aquamarine3")
   text(x  = mean(plotdata$three_minutes), y = 0.69, labels = "<--compliant-->", cex = 0.8)
   axis.POSIXct(1, at=seq(from = floor_date(plotdata$three_minutes[1], unit = "hour"), to = ceiling_date(plotdata$three_minutes[nrow(plotdata)], unit = "hour"), by = "hour", labels=format(plotdata$three_minutes, "%h")), las = 2)
@@ -77,21 +91,41 @@ for (i in 1:length(stacked_files)) {
 dev.off()
 
 
-# Histogram of hours worn
-ECM <- paste0("ECMF", c("01", "02", "18", "19", "20", "26", "27", "28", "29", "30"))
-Lascar <- paste0("ECMF",c("08", "09", "10", "16", "17", "21", "22", "23", "24", "25"))
-MicroPEM <- c(03, 04, 05, 06, 07, 11, 12, 13, 14, 15)
 
 
-names(hours_summary) <- c("file", "hours_worn", "percent_worn")
+names(hours_summary) <- c("file", "hours_worn", "percent_worn", "duration_hrs", "percent_worn_16")
 hours_summary$studyid <- substr(hours_summary$file, start = regexpr("ECMF", hours_summary$file ), stop = regexpr("ECMF", hours_summary$file ) + 5)
 hours_summary$unit_type <- NA
 hours_summary$unit_type <- ifelse(hours_summary$studyid %in% ECM, "ECM", ifelse(hours_summary$studyid %in% Lascar, "Lascar", NA))
 
-par(mfrow = c(1,2))
-hist(hours_summary$hours_worn[hours_summary$unit_type == "Lascar"], col = "lightblue", main = paste("ECM Pilot \n Hours Worn: Lascar \n Mean Hours =", round(mean(hours_summary$hours_worn[hours_summary$unit_type == "Lascar"]), digits = 1)), xlim = c(0, 30))
-hist(upem_hours_summary$percent_worn[hours_summary$unit_type == "Lascar"], col = "lightcoral", main = paste("ECM Pilot \n Percent of Time Worn: Lascar \n Mean Percent =", round(mean(hours_summary$percent_worn[hours_summary$unit_type == "Lascar"]), digits = 1)), xlim = c(0, 100))
+############################ Jan 4
+# make upem_summary-----
+names(upem_hours_summary) <- c("file", "hours_worn", "percent_worn", "duration", "percent_worn_16")
 
-hist(hours_summary$hours_worn[hours_summary$unit_type == "ECM"], col = "lightblue", main = paste("ECM Pilot \n Hours Worn: ECM \n Mean Percent = ", round(mean(hours_summary$hours_worn[hours_summary$unit_type == "ECM"]), digits = 1)), xlim = c(0, 30))
-hist(upem_hours_summary$percent_worn[hours_summary$unit_type == "ECM"], col = "lightcoral", main = paste("ECM Pilot \n Percent of Time Worn: ECM \n Mean Percent =", round(mean(hours_summary$percent_worn[hours_summary$unit_type == "ECM"]), digits = 1)),xlim = c(0, 100))
+
+hours_summary$studyid <- substr(hours_summary$file, start = regexpr("ECMF", hours_summary$file ), stop = regexpr("ECMF", hours_summary$file ) + 5)
+hours_summary$unit_type <- NA
+hours_summary$unit_type <- ifelse(hours_summary$studyid %in% ECM, "ECM", ifelse(hours_summary$studyid %in% Lascar, "Lascar", NA))
+
+hours_summary <- rbind(hours_summary, upem_hours_summary)
+
+saveRDS(hours_summary, file = "ECM_pilot_hours_worn.rds")
+write.csv(hours_summary, file = "ECM_pilot_hours_worn.csv")
+
+# add deployment duration and percent worn out of 16 hours to hours_summary
+
+
+pdf(file = "ECM_Pilot_Hours_Worn.pdf", width = 10, height = 10)
+par(mfrow = c(3,2), oma = c(0,0,3,0))
+hist(hours_summary$hours_worn[hours_summary$unit_type == "Lascar"], col = "lightblue", main = paste("Hours Worn: Lascar (n =", nrow(hours_summary[hours_summary$unit_type == "Lascar",]), ") \n Mean Hours =", round(mean(hours_summary$hours_worn[hours_summary$unit_type == "Lascar"]), digits = 1)), xlim = c(0, 25), xlab = "Hours")
+hist(upem_hours_summary$percent_worn[hours_summary$unit_type == "Lascar"], col = "lightcoral", main = paste("Percent of Time Worn: Lascar (n =", nrow(hours_summary[hours_summary$unit_type == "Lascar",]), ")\n Mean Percent =", round(mean(hours_summary$percent_worn[hours_summary$unit_type == "Lascar"]), digits = 1)), xlim = c(0, 100), xlab = "Percent of Time Worn")
+
+hist(hours_summary$hours_worn[hours_summary$unit_type == "ECM"], col = "lightblue", main = paste("Hours Worn: ECM (n =", nrow(hours_summary[hours_summary$unit_type == "ECM",]), ") \n Mean Percent = ", round(mean(hours_summary$hours_worn[hours_summary$unit_type == "ECM"]), digits = 1)), xlim = c(0, 25), xlab = "Hours")
+hist(upem_hours_summary$percent_worn[hours_summary$unit_type == "ECM"], col = "lightcoral", main = paste("Percent of Time Worn: ECM (n =", nrow(hours_summary[hours_summary$unit_type == "ECM",]), ") \n Mean Percent =", round(mean(hours_summary$percent_worn[hours_summary$unit_type == "ECM"]), digits = 1)),xlim = c(0, 100), xlab = "Percent of Time Worn")
+
+hist(hours_summary$hours_worn[hours_summary$unit_type == "MicroPEM"], col = "lightblue", main = paste("Hours Worn: MicroPEM (n =", nrow(hours_summary[hours_summary$unit_type == "MicroPEM",]), ")\n Mean Percent = ", round(mean(hours_summary$hours_worn[hours_summary$unit_type == "MicroPEM"]), digits = 1)), xlim = c(0, 25), xlab = "Hours")
+hist(hours_summary$percent_worn[hours_summary$unit_type == "MicroPEM"], col = "lightcoral", main = paste("Percent of Time Worn: MicroPEM (n =", nrow(hours_summary[hours_summary$unit_type == "MicroPEM",]), ")\n Mean Percent =", round(mean(hours_summary$percent_worn[hours_summary$unit_type == "MicroPEM"]), digits = 1)),xlim = c(0, 100), xlab = "Percent of Time Worn")
+mtext("Feasibility Pilot", side = 3, outer = TRUE, cex = 1.5)
+
+dev.off()
 

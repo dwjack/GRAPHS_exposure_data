@@ -1,8 +1,12 @@
 # Lascar file duplicate/problem identification by session
 
+# set path
+path <- "~/Dropbox/Ghana_exposure_data_SHARED (1)/Main_study_exposure_assessment"
+
+################# Run script from here to the end
 
 ## get Lascar files
-files<-list.files("~/Dropbox/Ghana_exposure_data_SHARED (1)/Main_study_exposure_assessment",recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=F) 
+files<-list.files(path,recursive=T,pattern="^(CU_CO|CU_C0|CO_USB|COL_USB|CU-CO|CU-C0|CO-USB|COL-USB)", full.names=F) 
 length(files)  #4894
 
 # make a data frame of the files
@@ -60,7 +64,7 @@ Naming_problems$problem_session <- as.character(Naming_problems$problem_session)
 Naming_problems <- Naming_problems[order(Naming_problems$mstudyid),]
 
 # save as .csv
-write.csv(Naming_problems, file = paste0("Naming_problems_", format(Sys.Date(), format = "%b%d"), ".csv"), row.names = FALSE)
+write.csv(Naming_problems, file = paste0("Naming_problems_", format(Sys.Date(), format = "%Y%b%d"), ".csv"), row.names = FALSE)
 
 ############################
 
