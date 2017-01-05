@@ -142,16 +142,33 @@ saveRDS(co_summarized_only1, file = "co_summarized_only1.rds")
 # merge data (including CO validated as 1 or 2) and save 
 alldata <- merge(bw_new, co_summarized_1and2, by = "mstudyid", all.x = TRUE)
 
+# add PM data
+pm <- readRDS("/Users/ashlinn/Documents/Birthweight ER analysis/PM data/PMCO.rds")
+# each row is a day, "CorPM" is the PM value for the day? The day is "PMday" So take the average of all CorPM values that occurred prior to the birth date. (Could also use "lastdate" from the CO data which is merged here)
+
+pm <- pm[, c("mstudyid", "PMday", "CorPM")]
+
+length(unique(alldata$mstudyid))
+length(unique(pm$mstudyid))
+length(unique(pm$mstudyid[unique(pm$mstudyid) %in% unique(alldata$mstudyid)]))
+
+# Subset the data prior to the birth date and summarize for each participant
+pmdata <- merge(pm, alldata[, c("mstudyid", "birthdate")], by = "mstudyid")
+head(pmdata[which(pmdata$birthdate < pmdata$PMday),])
+pmdata <- pmdata[pmdata$PMday <= pmdata$birthdate,]
+pmsummary <- group_by(pmdata, mstudyid) %>% summarise(CorPM = mean(CorPM)) # the mean PM before birth
+
+length(unique(pmsummary$mstudyid)) # 749 women with PM prior to birth
+
+# merge with other data
+alldata <- merge(alldata, pmsummary, by = "mstudyid", all.x = TRUE)
+
 saveRDS(alldata, file = paste0("bw_er_data_1and2_", format(Sys.Date(), format = "%b%d"), ".rds"))
 
-# merge data (including CO validated 1 only) and save 
-alldata1 <- merge(bw_new, co_summarized_only1, by = "mstudyid", all.x = TRUE)
-
-saveRDS(alldata1, file = paste0("bw_er_data_only1_", format(Sys.Date(), format = "%b%d"), ".rds"))
 
 ################### ANALYSIS ########################
 
-alldata <- readRDS("/Users/ashlinn/Documents/Birthweight ER analysis/BW ER Analysis/bw_er_data_1and2_Dec20.rds")
+alldata <- readRDS("/Users/ashlinn/Documents/Birthweight ER analysis/BW ER Analysis/bw_er_data_1and2_Jan05.rds")
 # these CO measurements are averages prior to delivery
 
 # see http://www.unige.ch/ses/sococ/cl/r/tasks/outliers.e.html
@@ -394,3 +411,37 @@ print(p1)
 print(p2)
 print(p3)
 dev.off()
+
+
+## Analysis with PM --------------
+
+
+# models
+alldata_bw <- alldata[!is.na(alldata$bweight_grams) & !is.na(alldata$CorPM),]
+
+results_pm <- data.frame(model= NA, coefficient= NA, p.value = NA, per_10pct_PM = NA, per_IQR_PM = NA, n = NA)
+
+fm <- lm(bweight_grams ~ log(CorPM), data = alldata_bw)
+quantile(alldata_bw$CorPM) # 25: 43.568; 75: 103. 558
+cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -33, not sig
+results_pm[1,1] <- as.character(fm$call[2])
+results_pm[1,2] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] # coef
+results_pm[1,3] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,4] # pval
+results_pm[1,4] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(1.1) # 10%
+results_pm[1,5] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(103.558/43.568) # IQR
+results_pm[1,6] <- length(fm$residuals)
+
+
+fm <- lm(bweight_grams ~ log(CorPM) + calcparity, data = alldata_bw)
+quantile(alldata_bw$CorPM) # 25: 43.568; 75: 103. 558
+cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -33, not sig
+results_pm[2,1] <- as.character(fm$call[2])
+results_pm[2,2] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] # coef
+results_pm[2,3] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,4] # pval
+results_pm[2,4] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(1.1) # 10%
+results_pm[2,5] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(103.558/43.568) # IQR
+results_pm[2,6] <- length(fm$residuals)
+
+p1 <- ggplot(aes(CorPM, bweight_grams), data = alldata_bw)
+p1 <- p1 + geom_point() + scale_x_log10() + geom_smooth(method = "loess") + xlab("Mean PM")+ ylab("Birth Weight (grams)")
+p1
