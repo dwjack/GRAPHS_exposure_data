@@ -1,11 +1,14 @@
 library(haven)
 #library(sjPlot)
 #library(sjmisc)
+library(plyr)
 library(dplyr)
 library(lubridate)
 library(nlme)
 library(sandwich)
 library(lmtest)
+library(ggplot2)
+library(gridExtra)
 
 ############# DATA PREP ##################
 # load original data
@@ -35,7 +38,7 @@ table(bw_new$b1alive1)
 bw_new<- bw_new[bw_new$b1alive1 ==1,]
 
 # select variables
-bw_new <- select(bw_new, c(mstudyid, cluster, age, medlev, numyrs, married, religion, ethnic, wownland, farmln, salary, househead, electric, comptype, Mage, wealthindex2, wealthindex, cstudyid,  datebwt, timebwt, bwtlght1, bplace, b1placbir2, bsex1, banomaly1, b1alive1, bp, anaemia2, diabetes, hiv, smokecur, smokhh, smokcc, wtkg, htcm, trialedd, age, DAYSOFFEDD, datdeliv2, GESTAGE_DAYS, GESTAGE_WEEKS, PTB, PTBCAT, BWEIGHT, BWEIGHT_GRAMS, LBW, SGA, BLENGTH, HCIRC, GESTAGE_ENROLL_WEEK, GESTAGE_ENROL_WKI, CALCPARITY, COMMUNITY))
+bw_new <- select(bw_new, c(mstudyid, cluster, age, medlev, numyrs, married, religion, ethnic, wownland, farmln, salary, househead, electric, comptype, Mage, wealthindex2, wealthindex, cstudyid,  datebwt, timebwt, bwtlght1, bplace, b1placbir2, bsex1, banomaly1, b1alive1, bp, anaemia2, diabetes, hiv, smokecur, smokhh, smokcc, wtkg, htcm, trialedd, age, DAYSOFFEDD, datdeliv2, numancvist, sbp, dbp, urineprot, GESTAGE_DAYS, GESTAGE_WEEKS, PTB, PTBCAT, BWEIGHT, BWEIGHT_GRAMS, LBW, SGA, BLENGTH, HCIRC, GESTAGE_ENROLL_WEEK, GESTAGE_ENROL_WKI, CALCPARITY, COMMUNITY))
 
 # names to lower case
 names(bw_new) <- tolower(names(bw_new))
@@ -140,6 +143,8 @@ co_summarized_only1 <- group_by(co_only1, mstudyid) %>% summarise(
 saveRDS(co_summarized_only1, file = "co_summarized_only1.rds")
 
 # merge data (including CO validated as 1 or 2) and save 
+
+co_summarized_1and2 <- readRDS("/Users/ashlinn/Documents/Birthweight ER analysis/BW ER Analysis/co_summarized_1and2.rds")
 alldata <- merge(bw_new, co_summarized_1and2, by = "mstudyid", all.x = TRUE)
 
 # add PM data
@@ -163,14 +168,21 @@ length(unique(pmsummary$mstudyid)) # 749 women with PM prior to birth
 # merge with other data
 alldata <- merge(alldata, pmsummary, by = "mstudyid", all.x = TRUE)
 
-saveRDS(alldata, file = paste0("bw_er_data_1and2_", format(Sys.Date(), format = "%b%d"), ".rds"))
+# remove BM1607M with no CO data
+alldata <- alldata[!alldata$mstudyid == "BM1607M",]
 
+# variables to include:
+# calcparity (parity)/mage/bmi/bsex1 (binary 1:2)/ numancvist(more vs less than 4)/ urineprot(ever yes vs always no)/ htn
+alldata$bmi <- alldata$wtkg/((alldata$htcm*.01)^2)
+alldata$bsex <- mapvalues(alldata$bsex1, from = c(1,2), to = c(0,1)) # 0 is male, 1 is female
+alldata$numancvist_bin <- alldata$numancvist
+alldata$numancvist_bin[alldata$numancvist_bin %in% c(88,99)] <- NA
+alldata$numancvist_bin <- mapvalues(alldata$numancvist_bin, from = c(1:4, 5:14, NA), to = c(0,0,0,0,1,1,1,1,1,1,1,1,1, 1, NA)) # 1 is adequate (>4 visits), 0 is inadequate
+alldata$urineprot_bin <- alldata$urineprot
+alldata$urineprot_bin <- mapvalues(alldata$urineprot, from = c(1,2,3,8), to = c(1, 0, NA, NA)) # 1 is ever positive, 0 is always negative, NA = not done or not known
+alldata$htn <- ifelse(alldata$bp == 1 | alldata$sbp > 140 | alldata$dbp > 90, 1, 0)        # 23 have either history of HTN or elevated BP (DBP > 90) at baseline
 
-################### ANALYSIS ########################
-
-alldata <- readRDS("/Users/ashlinn/Documents/Birthweight ER analysis/BW ER Analysis/bw_er_data_1and2_Jan05.rds")
-# these CO measurements are averages prior to delivery
-
+# OUTLIERS
 # see http://www.unige.ch/ses/sococ/cl/r/tasks/outliers.e.html
 
 # outliers defined as values more than 3.5 times the interquartile range from the edges of the interquartile range (the box). E.g. above the 3rd quartile or below the 1st quartile.
@@ -186,12 +198,30 @@ boxplot(alldata$hcirc, range = 3.5, main = "head circumference") # some outliers
 boxplot(alldata$gestage_weeks, range = 3.5, main = "Gest Age in weeks") # some outliers
 dev.off()
 
+# set outliers for blength, hcirc, and bweight to NA using 3.5x IQR as criterion (what about BMI, keep all values?)
+for (i in c("blength", "hcirc", "bweight_grams")) {
+        print(i)
+        print(boxplot.stats(alldata[,i], coef = 3.5)$out)
+        alldata[,i] <- ifelse(alldata[,i] %in% boxplot.stats(alldata[,i], coef = 3.5)$out | is.na(alldata[,i]), NA, alldata[,i])
+}
+
 
 # checking normality
 hist(alldata$bweight_grams) # very normal
 hist(alldata$co_dailymean_corr) # very right-skewed
-hist(alldata$hcirc[alldata$hcirc < 150]) # normal except for outliers
+hist(alldata$hcirc) # normal except for outliers
 hist(alldata$blength) # some outliers on low end, otherwise normal
+
+
+saveRDS(alldata, file = paste0("bw_er_data_1and2_", format(Sys.Date(), format = "%b%d"), ".rds"))
+
+
+################### ANALYSIS ########################
+
+alldata <- readRDS("/Users/ashlinn/Documents/Birthweight ER analysis/BW ER Analysis/bw_er_data_1and2_Jan06.rds")
+# these CO measurements are averages prior to delivery
+
+
 
 ######## BIRTH WEIGHT AS OUTCOME ########
 
@@ -219,97 +249,114 @@ cl   <- function(data,fm, cluster){ # fm is the "fitted model" from a linear reg
 # # here, we are clustering on state.
 # cl(data = nmar, fm = regt, cluster = nmar$state)
 
+## CONFIDENCE INTERVALS-----
+# 95% CI: coef +/- SE*t^alpha/2,n-k-1
 
-# variables to include:
-# calcparity (parity)/mage/bmi/wealthindex/bsex1 (binary 1:2)
-alldata$bmi <- alldata$wtkg/((alldata$htcm*.01)^2)
-alldata$bsex <- mapvalues(alldata$bsex1, from = c(1,2), to = c(0,1)) # 0 is male, 1 is female
+# what is the critical T value: use qt()
+qt(c(.025, .975), df=1291) 
 
-# unadjusted models for bweight_grams ---------
+
+
+# unadjusted models for continuous variables ---------
 # co logged
 # interpretation: http://www.kenbenoit.net/courses/ME104/logmodels2.pdf
 # The expected change in Y associated with a p% increase in X can be calculated as βˆ · log([100 + p]/100). So to work out the expected change associated with a 10% increase in X , therefore, multiply βˆ by log(110/100) = log(1.1) = .095. In other words, 0.095βˆ is the expected change in Y when X is multiplied by 1.1, i.e. increases by 10%.
 
-# Subset complete data
-# 10 NAs for bweight_grams, 45 NAs for co_dailymean_corr
-alldata_bw <- alldata[!is.na(alldata$bweight_grams),]
+allresults <- data.frame(matrix(ncol = 8, nrow = 0))
+colnames(allresults) <- c("model", "coefficient", "p.value", "per_10pct", "per_IQR", "n", "outcome", "exposure", "lower_CI", "upper_CI")
+for (i in c("bweight_grams", "blength", "hcirc")) {
+                outcome <- i
+        for (j in c("co_mean_corr", "CorPM")) {
+                exposure <- j
+                
+labels <- data.frame(varname = c("bweight_grams", "blength", "hcirc", "co_mean_corr", "CorPM"), label = c("Birth Weight (g)", "Birth Length (cm)", "Head Circumference (cm)", "Mean CO (ppm)", "Mean PM (ug/m3)"))
 
-results <- data.frame(model= NA, coefficient= NA, p.value = NA, per_10pct_CO = NA, per_IQR_CO = NA, n = NA)
+results <- data.frame(model= NA, coefficient= NA, p.value = NA, per_10pct = NA, per_IQR = NA, n = NA, outcome = NA, exposure = NA, lower_CI = NA, upper_CI = NA)
 
-fm <- lm(bweight_grams ~ log(co_mean_corr), data = alldata_bw)
 
-cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -55,  sig
-results[1,1] <- as.character(fm$call[2])
-results[1,2] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] # coef
-results[1,3] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,4] # pval
-results[1,4] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(1.1) # 10%
-results[1,5] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(1.706/0.698) # IQR
-results[1,6] <- length(fm$residuals)
+pct75 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.75)
+pct25 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.25)
 
-# quantiles, method 1
-fm <- lm(bweight_grams ~ log(co_q85_corr +0.01), data = alldata_bw)
-cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -32, sig
-# how to adjust for the 0.01 addition in the interpretation?
+data <- alldata[complete.cases(alldata[, c(outcome, exposure)]),]
+fm <- lm(data[,outcome] ~ log(data[,exposure]), data = data)
 
-fm <- lm(bweight_grams ~ log(co_q95_corr + 0.01), data = alldata_bw)
-cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -45, sig
-plot(fm)
 
-# quantiles, method 2
-alldata_bw_quantiles <- alldata_bw[!alldata_bw$co_q85_corr == 0,]
-fm <- lm(bweight_grams ~ log(co_q85_corr), data = alldata_bw_quantiles)
-cl(fm = fm, data = alldata_bw_quantiles, cluster = alldata_bw_quantiles$community) # -39, sig
+cl(fm = fm, data = data, cluster = data[, "community"]) #
+results[1,1] <- as.character(fm$call[2]) # model
+results[1,2] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,1] # coef
+results[1,3] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,4] # pval
+results[1,4] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,1] *log(1.1) # 10%
+results[1,5] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,1] *log(pct75/pct25) # IQR
+results[1,6] <- length(fm$residuals) # n
+results[1,7] <- outcome
+results[1,8] <- exposure
+# for confint: coef +/- SE*t^alpha/2,n-k-1
+results[1,9] <-  cl(fm = fm, data = data, cluster = data[, "community"])[2,1] + cl(fm = fm, data = data, cluster = data[, "community"])[2,2]*qt(c(.025, .975), df=length(fm$residuals) - (length(fm$coefficients) - 1))[1]  # lower bound
+results[1,10] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,1] + cl(fm = fm, data = data, cluster = data[, "community"])[2,2]*qt(c(.025, .975), df=length(fm$residuals) - (length(fm$coefficients) - 1))[2] # upper bound
 
-fm <- lm(bweight_grams ~ log(co_q95_corr), data = alldata_bw_quantiles)
-cl(fm = fm, data = alldata_bw_quantiles, cluster = alldata_bw_quantiles$community) # -37, NOT sig
+# save regression plots
+pdf(file = paste0(outcome, exposure, "_regressionplots_unadj.pdf"))
+par(mfrow = c(3,2))
+plot(fm, which = 1:6, ask = FALSE)
+dev.off()
 
-alldata_bw_daily <- alldata_bw[!is.na(alldata_bw$co_dailymean_corr),]
-fm <- lm(bweight_grams ~ log(co_dailymean_corr), data = alldata_bw_daily) 
-cl(fm = fm, data = alldata_bw_daily, cluster = alldata_bw_daily$community) # -48, sig
+# save scatterplot
+pdf(file = paste0(i, "_scatterplot.pdf"))
+p <- ggplot(aes(co_mean_corr, data[,i]), data = data)
+p <- p + geom_point() + scale_x_log10(breaks = c(0, 0.1, 1, 10, 30)) + geom_smooth(method = "loess") + xlab("Mean CO (ppm)")+ ylab(labels$label[labels$varname == i])
+print(p)
+dev.off()
 
-# unadjusted models for blength ---------
-alldata_blength <- alldata[!is.na(alldata$blength),]
-fm <- lm(blength ~ log(co_mean_corr), data = alldata_blength)
-model <- cl(fm = fm, data = alldata_blength, cluster = alldata_blength$community) # -0.32, sig
-results[2,1] <- as.character(fm$call[2])
-results[2,2] <- model[2,1] # coef
-results[2,3] <-model[2,4] # pval
-results[2,4] <- model[2,1] *log(1.1) # 10%
-results[2,5] <- model[2,1] *log(1.706/0.698) # IQR
+# adjusted
+data <- alldata[complete.cases(alldata[, c(outcome, exposure, "bmi", "mage", "calcparity", "bsex", "numancvist_bin", "htn")]),]
+fm <- lm(data[,outcome] ~ log(data[, exposure]) + bmi + mage + calcparity + bsex + numancvist_bin + htn, data = data)
+
+
+cl(fm = fm, data = data, cluster = data[, "community"]) #
+results[2,1] <- as.character(fm$call[2]) # model
+results[2,2] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,1] # coef
+results[2,3] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,4] # pval
+results[2,4] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,1] *log(1.1) # 10%
+results[2,5] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,1] *log(pct75/pct25) # IQR
 results[2,6] <- length(fm$residuals)
+results[2,7] <- outcome
+results[2,8] <- exposure
+results[2,9] <-  cl(fm = fm, data = data, cluster = data[, "community"])[2,1] + cl(fm = fm, data = data, cluster = data[, "community"])[2,2]*qt(c(.025, .975), df=length(fm$residuals) - (length(fm$coefficients) - 1))[1]  # lower bound
+results[2,10] <- cl(fm = fm, data = data, cluster = data[, "community"])[2,1] + cl(fm = fm, data = data, cluster = data[, "community"])[2,2]*qt(c(.025, .975), df=length(fm$residuals) - (length(fm$coefficients) - 1))[2] # upper bound
 
-fm <- lm(blength ~ log(co_q85_corr + 0.01), data = alldata_blength)
-cl(fm = fm, data = alldata_blength, cluster = alldata_blength$community) # -0.22, sig
+# add to all results
+allresults <- rbind(allresults, results)
 
-fm <- lm(blength ~ log(co_q95_corr + 0.01), data = alldata_blength)
-cl(fm = fm, data = alldata_blength, cluster = alldata_blength$community) # -0.22, not sig
-
-alldata_blength_daily <- alldata_blength[!is.na(alldata_blength$co_dailymean_corr),]
-fm <- lm(blength ~ log(co_dailymean_corr), data = alldata_blength_daily)
-cl(fm = fm, data = alldata_blength_daily, cluster = alldata_blength_daily$community) # -0.29, not sig
-
-
-# unadjusted models for head circ ---------
-alldata_hcirc <- alldata[!is.na(alldata$hcirc),]
-fm <- lm(hcirc ~ log(co_mean_corr), data = alldata_hcirc)
-model <- cl(fm = fm, data = alldata_hcirc, cluster = alldata_hcirc$community) # -0.19, not sig
-results[3,1] <- as.character(fm$call[2])
-results[3,2] <- model[2,1] # coef
-results[3,3] <-model[2,4] # pval
-results[3,4] <- model[2,1] *log(1.1) # 10%
-results[3,5] <- model[2,1] *log(1.706/0.698) # IQR
-results[3,6] <- length(fm$residuals)
+pdf(file = paste0(outcome, exposure, "_regressionplots_adj.pdf"))
+par(mfrow = c(3,2))
+plot(fm, which = 1:6, ask = FALSE)
+dev.off()
+        }
+}
+write.csv(allresults, file = "bw_continuous_results.csv", row.names = FALSE)
 
 
-fm <- lm(hcirc ~ log(co_q85_corr + 0.01), data = alldata_hcirc)
-cl(fm = fm, data = alldata_hcirc, cluster = alldata_hcirc$community) # -0.07,  not sig
 
-fm <- lm(hcirc ~ log(co_q95_corr + 0.01), data = alldata_hcirc)
-cl(fm = fm, data = alldata_hcirc, cluster = alldata_hcirc$community) # -0.10, not sig
-
-alldata_hcirc_daily <- alldata_hcirc[!is.na(alldata_hcirc$co_dailymean_corr),]
-fm <- lm(hcirc ~ log(co_dailymean_corr), data = alldata_hcirc_daily)
-cl(fm = fm, data = alldata_hcirc_daily, cluster = alldata_hcirc_daily$community) # -0.15, not sig
+# # quantiles, method 1
+# fm <- lm(bweight_grams ~ log(co_q85_corr +0.01), data = alldata_bw)
+# cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -32, sig
+# # how to adjust for the 0.01 addition in the interpretation?
+# 
+# fm <- lm(bweight_grams ~ log(co_q95_corr + 0.01), data = alldata_bw)
+# cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -45, sig
+# plot(fm)
+# 
+# # quantiles, method 2
+# alldata_bw_quantiles <- alldata_bw[!alldata_bw$co_q85_corr == 0,]
+# fm <- lm(bweight_grams ~ log(co_q85_corr), data = alldata_bw_quantiles)
+# cl(fm = fm, data = alldata_bw_quantiles, cluster = alldata_bw_quantiles$community) # -39, sig
+# 
+# fm <- lm(bweight_grams ~ log(co_q95_corr), data = alldata_bw_quantiles)
+# cl(fm = fm, data = alldata_bw_quantiles, cluster = alldata_bw_quantiles$community) # -37, NOT sig
+# 
+# alldata_bw_daily <- alldata_bw[!is.na(alldata_bw$co_dailymean_corr),]
+# fm <- lm(bweight_grams ~ log(co_dailymean_corr), data = alldata_bw_daily) 
+# cl(fm = fm, data = alldata_bw_daily, cluster = alldata_bw_daily$community) # -48, sig
 
 # Adjusted models ------------
 
@@ -350,98 +397,65 @@ for (i in c("calcparity", "bmi", "mage", "bsex", "wealthindex")) {
 
 
 
-# Adjusted
-fm <- lm(bweight_grams ~ log(co_mean_corr) + calcparity, data = alldata_bw)
-model <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -63,  sig
-# interp: a 10% increase in CO is associated with log(1.1)*(-63.23) = -6 grams difference in bw. 
-# for IQR: 75th percentile = 1.706, 25th = 0.698. A one-IQR increase in CO is associated with log(1.706/0.698)* (-63.23) = -57 grams difference in bw. 
-results[4,1] <- as.character(fm$call[2])
-results[4,2] <- model[2,1] # coef
-results[4,3] <-model[2,4] # pval
-results[4,4] <- model[2,1] *log(1.1) # 10%
-results[4,5] <- model[2,1] *log(1.706/0.698) # IQR
-results[4,6] <- length(fm$residuals)
-
-fm <- lm(blength ~ log(co_mean_corr) + calcparity, data = alldata_blength)
-model <- cl(fm = fm, data = alldata_blength, cluster = alldata_blength$community) # -63,  sig
-# interp: a 10% increase in CO is associated with log(1.1)*(-63.23) = -6 grams difference in bw. 
-# for IQR: 75th percentile = 1.706, 25th = 0.698. A one-IQR increase in CO is associated with log(1.706/0.698)* (-63.23) = -57 grams difference in bw. 
-results[5,1] <- as.character(fm$call[2])
-results[5,2] <- model[2,1] # coef
-results[5,3] <-model[2,4] # pval
-results[5,4] <- model[2,1] *log(1.1) # 10%
-results[5,5] <- model[2,1] *log(1.706/0.698) # IQR
-results[5,6] <- length(fm$residuals)
-
-fm <- lm(hcirc ~ log(co_mean_corr) + calcparity, data = alldata_hcirc)
-model <- cl(fm = fm, data = alldata_hcirc, cluster = alldata_hcirc$community) # -63,  sig
-# interp: a 10% increase in CO is associated with log(1.1)*(-63.23) = -6 grams difference in bw. 
-# for IQR: 75th percentile = 1.706, 25th = 0.698. A one-IQR increase in CO is associated with log(1.706/0.698)* (-63.23) = -57 grams difference in bw. 
-results[6,1] <- as.character(fm$call[2])
-results[6,2] <- model[2,1] # coef
-results[6,3] <-model[2,4] # pval
-results[6,4] <- model[2,1] *log(1.1) # 10%
-results[6,5] <- model[2,1] *log(1.706/0.698) # IQR
-results[6,6] <- length(fm$residuals)
-
-
-write.csv(results, file = "bw_er_results.csv", row.names = FALSE)
-
 
 
 ######### LBW, SGA, PTB #########
 
 # binary outcomes... 
+# issues: how to calculate robust standard errors?
+# Diagnostics?
 
 
-# Plot ------
-library(ggplot2)
-library(gridExtra)
-p1 <- ggplot(aes(co_mean_corr, bweight_grams), data = alldata_bw)
-p1 <- p1 + geom_point() + scale_x_log10(breaks = c(0, 0.1, 1, 10, 30)) + geom_smooth(method = "loess") + xlab("Mean CO (ppm)")+ ylab("Birth Weight (grams)")
+allresults <- data.frame(matrix(ncol = 9, nrow = 0))
+colnames(allresults) <- c("model", "coefficient", "p.value", "n", "outcome", "exposure", "OR_per_doubling", "OR_lower_CI", "OR_upper_CI")
 
-p2 <- ggplot(aes(co_mean_corr, blength), data = alldata_bw)
-p2 <- p2 + geom_point() + scale_x_log10(breaks = c(0, 0.1, 1, 10, 30)) + geom_smooth(method = "loess") + xlab("Mean CO (ppm)")+ ylab("Birth Length (cm)")
+for (i in c("lbw", "sga", "ptb")) {
+        outcome <- i
+        for (j in c("co_mean_corr", "CorPM")) {
+                exposure <- j
+                
+                labels <- data.frame(varname = c("lbw", "sga", "ptb", "co_mean_corr", "CorPM"), label = c("Low Birth Weight", "Small for Gestational Age", "Preterm Birth", "Mean CO (ppm)", "Mean PM (ug/m3)"))
+                
+                results <- data.frame(model= NA, coefficient= NA, p.value = NA, n = NA, outcome = NA, exposure = NA, OR_per_doubling = NA, OR_lower_CI = NA, OR_upper_CI = NA)
+                
+                
+                
+                data <- alldata[complete.cases(alldata[, c(outcome, exposure)]),]
+                fm <- glm(data[,outcome] ~ log2(data[,exposure]), data = data, family = "binomial") # if use base 2 for the log then the exponentiated coefficient represents the odds ratio associated with a doubling in exposure
+                
+                
+               #  cl(fm = fm, data = data, cluster = data[, "community"]) # not working for logistic models
+                results[1,1] <- as.character(fm$call[2]) # model
+                results[1,2] <- summary(fm)$coef[2,1] # coef
+                results[1,3] <- summary(fm)$coef[2,4] # pval
+                results[1,4] <- length(fm$residuals) # n
+                results[1,5] <- outcome
+                results[1,6] <- exposure
+                results[1,7] <-exp(summary(fm)$coef[2,1]) # OR  for doubling of exposure (log2)
+                results[1,8] <- exp(confint(fm))[2,1] # lower bound of OR
+                results[1,9] <- exp(confint(fm))[2,2] # upper bound of OR
+                
+                
+                # adjusted
+                data <- alldata[complete.cases(alldata[, c(outcome, exposure, "bmi", "mage", "calcparity", "bsex", "numancvist_bin", "htn")]),]
+                fm <- lm(data[,outcome] ~ log2(data[, exposure]) + bmi + mage + calcparity + bsex + numancvist_bin + htn, data = data)
+                
+                
+                # cl(fm = fm, data = data, cluster = data[, "community"]) #
+                results[2,1] <- as.character(fm$call[2]) # model
+                results[2,2] <- summary(fm)$coef[2,1] # coef
+                results[2,3] <- summary(fm)$coef[2,4] # pval
+                results[2,4] <- length(fm$residuals) # n
+                results[2,5] <- outcome
+                results[2,6] <- exposure
+                results[2,7] <-exp(summary(fm)$coef[2,1]) # OR  for doubling of exposure (log2)
+                results[2,8] <- exp(confint(fm))[2,1] # lower bound of OR
+                results[2,9] <- exp(confint(fm))[2,2] # upper bound of OR
+                # add to all results
+                allresults <- rbind(allresults, results)
+                
+          
+        }
+}
+write.csv(allresults, file = "bw_logistic_results.csv", row.names = FALSE)
 
-p3 <- ggplot(aes(co_mean_corr, hcirc), data = alldata_bw)
-p3 <- p3 + geom_point() + scale_x_log10(breaks = c(0, 0.1, 1, 10, 30)) + geom_smooth(method = "loess") + xlab("Mean CO (ppm)")+ ylab("Head Circumference (cm)")
-
-pdf(file = "BW_BL_HC_scatterplots.pdf", bg = "white")
-print(p1)
-print(p2)
-print(p3)
-dev.off()
-
-
-## Analysis with PM --------------
-
-
-# models
-alldata_bw <- alldata[!is.na(alldata$bweight_grams) & !is.na(alldata$CorPM),]
-
-results_pm <- data.frame(model= NA, coefficient= NA, p.value = NA, per_10pct_PM = NA, per_IQR_PM = NA, n = NA)
-
-fm <- lm(bweight_grams ~ log(CorPM), data = alldata_bw)
-quantile(alldata_bw$CorPM) # 25: 43.568; 75: 103. 558
-cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -33, not sig
-results_pm[1,1] <- as.character(fm$call[2])
-results_pm[1,2] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] # coef
-results_pm[1,3] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,4] # pval
-results_pm[1,4] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(1.1) # 10%
-results_pm[1,5] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(103.558/43.568) # IQR
-results_pm[1,6] <- length(fm$residuals)
-
-
-fm <- lm(bweight_grams ~ log(CorPM) + calcparity, data = alldata_bw)
-quantile(alldata_bw$CorPM) # 25: 43.568; 75: 103. 558
-cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community) # -33, not sig
-results_pm[2,1] <- as.character(fm$call[2])
-results_pm[2,2] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] # coef
-results_pm[2,3] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,4] # pval
-results_pm[2,4] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(1.1) # 10%
-results_pm[2,5] <- cl(fm = fm, data = alldata_bw, cluster = alldata_bw$community)[2,1] *log(103.558/43.568) # IQR
-results_pm[2,6] <- length(fm$residuals)
-
-p1 <- ggplot(aes(CorPM, bweight_grams), data = alldata_bw)
-p1 <- p1 + geom_point() + scale_x_log10() + geom_smooth(method = "loess") + xlab("Mean PM")+ ylab("Birth Weight (grams)")
-p1
