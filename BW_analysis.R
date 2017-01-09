@@ -10,6 +10,9 @@ library(lmtest)
 library(ggplot2)
 library(gridExtra)
 
+## Skip to "data analysis" section for final data ----------
+
+
 ############# DATA PREP ##################
 # load original data
 bw <- read_dta("/Users/ashlinn/Documents/Birthweight ER analysis/BW_data_cleaned.dta")
@@ -216,7 +219,7 @@ hist(alldata$blength) # some outliers on low end, otherwise normal
 saveRDS(alldata, file = paste0("bw_er_data_1and2_", format(Sys.Date(), format = "%b%d"), ".rds"))
 
 
-################### ANALYSIS ########################
+################### DATA ANALYSIS ########################
 
 alldata <- readRDS("/Users/ashlinn/Documents/Birthweight ER analysis/BW ER Analysis/bw_er_data_1and2_Jan06.rds")
 # these CO measurements are averages prior to delivery
@@ -274,10 +277,14 @@ labels <- data.frame(varname = c("bweight_grams", "blength", "hcirc", "co_mean_c
 results <- data.frame(model= NA, coefficient= NA, p.value = NA, per_10pct = NA, per_IQR = NA, n = NA, outcome = NA, exposure = NA, lower_CI = NA, upper_CI = NA)
 
 
-pct75 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.75)
-pct25 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.25)
 
 data <- alldata[complete.cases(alldata[, c(outcome, exposure)]),]
+
+pct75 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.75)
+pct25 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.25)
+print(c(exposure,pct25, pct75))
+
+
 fm <- lm(data[,outcome] ~ log(data[,exposure]), data = data)
 
 
