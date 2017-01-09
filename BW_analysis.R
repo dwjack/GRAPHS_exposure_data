@@ -280,10 +280,10 @@ results <- data.frame(model= NA, coefficient= NA, p.value = NA, per_10pct = NA, 
 
 data <- alldata[complete.cases(alldata[, c(outcome, exposure)]),]
 
-pct75 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.75)
+pct75 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.75) # defines IQR based on the complete cases for outcome and exposure (not on the complete cases for all covariates)
 pct25 <- quantile(data[!is.na(data[, exposure]),exposure], probs = 0.25)
 print(c(exposure,pct25, pct75))
-
+print(IQR(alldata[complete.cases(alldata[, c(outcome, exposure)]),exposure]))
 
 fm <- lm(data[,outcome] ~ log(data[,exposure]), data = data)
 
@@ -341,6 +341,29 @@ dev.off()
         }
 }
 write.csv(allresults, file = "bw_continuous_results.csv", row.names = FALSE)
+
+
+# what is the CI for the results by IQR
+outcome <- "bweight_grams"
+exposure <- "co_mean_corr"
+data <- alldata[complete.cases(alldata[, c(outcome, exposure),]),]
+IQR <- IQR(data$co_mean_corr)
+
+# rescale the exposure by IQR
+alldata$co_IQR <- alldata$co_mean_corr/IQR
+
+exposure <- "co_IQR"
+        
+data <- alldata[complete.cases(alldata[, c(outcome, exposure, "bmi", "mage", "calcparity", "bsex", "numancvist_bin", "htn")]),]
+fm <- lm(data[,outcome] ~ log(data[, exposure]) + bmi + mage + calcparity + bsex + numancvist_bin + htn, data = data)
+
+
+cl(fm = fm, data = data, cluster = data[, "community"]) # -60.258
+
+cl(fm = fm, data = data, cluster = data[, "community"])[2,1] + cl(fm = fm, data = data, cluster = data[, "community"])[2,2]*qt(c(.025, .975), df=length(fm$residuals) - (length(fm$coefficients) - 1))[1]  # lower bound: -91.5
+cl(fm = fm, data = data, cluster = data[, "community"])[2,1] + cl(fm = fm, data = data, cluster = data[, "community"])[2,2]*qt(c(.025, .975), df=length(fm$residuals) - (length(fm$coefficients) - 1))[2]  # upper bound: -29.1
+
+# very similar results (only intercept different)...not 100% sure this is the correct way to do this
 
 
 
