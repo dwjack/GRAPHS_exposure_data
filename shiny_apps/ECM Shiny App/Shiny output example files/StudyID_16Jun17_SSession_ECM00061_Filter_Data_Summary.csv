@@ -1,0 +1,74 @@
+"Subject","Session","variable","V1","V2","V3","V4","V5","V6"
+"StudyID","SSession","**OVERALL.SUMMARY**","**OVERALL.SUMMARY**","**OVERALL.SUMMARY**","**OVERALL.SUMMARY**","**OVERALL.SUMMARY**","**OVERALL.SUMMARY**","**OVERALL.SUMMARY**"
+"StudyID","SSession","Total Sampling Time (hrs)","26",,,,,
+"StudyID","SSession","Total Sampling Time (mins)","1559",,,,,
+"StudyID","SSession","Start Time","15Jun17 08:39:00",,,,,
+"StudyID","SSession","Stop Time","16Jun17 10:37:00",,,,,
+"StudyID","SSession","Timezone","Africa/Abidjan",,,,,
+"StudyID","SSession","Mean Active Nephelometer (ug/m^3)","98.14",,,,,
+"StudyID","SSession","Mean Active Neph, HEPA corr (ug/m^3)","NaN",,,,,
+"StudyID","SSession","HEPA1_times (start/stop)",,,,,,
+"StudyID","SSession","HEPA2_times (start/stop)",,,,,,
+"StudyID","SSession","HEPA3_times (start/stop)",,,,,,
+"StudyID","SSession","Mean HEPA1 Nephelometer (ug/m^3)",,,,,,
+"StudyID","SSession","Mean HEPA2 Nephelometer (ug/m^3)",,,,,,
+"StudyID","SSession","Mean HEPA3 Nephelometer (ug/m^3)",,,,,,
+"StudyID","SSession","Compliance Threshold for minutewise SD","0.02",,,,,
+"StudyID","SSession","Total Time Composite SD>Threshold (mins)","215",,,,,
+"StudyID","SSession","Total Hours Worn (hrs)","6",,,,,
+"StudyID","SSession","Percent of Hours Worn (%)","22.2",,,,,
+"StudyID","SSession","Avg Voltage Drop per Hour (mV/hr)","22.92",,,,,
+"StudyID","SSession","Minutes RH > 92pct","0",,,,,
+"StudyID","SSession","Minutes RH > 100pct","0",,,,,
+"StudyID","SSession","Minutes Active Neph < 0","0",,,,,
+"StudyID","SSession","Minutes Active HEPA-corr Neph < 0",,,,,,
+"StudyID","SSession","**24.HOUR.SUMMARY**","**24.HOUR.SUMMARY**","**24.HOUR.SUMMARY**","**24.HOUR.SUMMARY**","**24.HOUR.SUMMARY**","**24.HOUR.SUMMARY**","**24.HOUR.SUMMARY**"
+"StudyID","SSession","Unique 24-hour period","Day 1","Day 2",,,,
+"StudyID","SSession","24-hour period start date","2017-06-15 08:39:00","2017-06-16 08:40:00",,,,
+"StudyID","SSession","RH-Corrected Nephelometer (ug/m^3)","90.1","196.32",,,,
+"StudyID","SSession","HEPA Correction (ug/m^3)",,,,,,
+"StudyID","SSession","HEPA-Corrected Nephelometer (ug/m^3)",,,,,,
+"StudyID","SSession","Temp (C)","18.8","17.94",,,,
+"StudyID","SSession","RH (%)","71.63","78.78",,,,
+"StudyID","SSession","Battery (V)","3.96","3.83",,,,
+"StudyID","SSession","Inlet.Pressure (H20)","0.48","0.54",,,,
+"StudyID","SSession","Flow.Orifice.Pressure (H20)","0.32","0.32",,,,
+"StudyID","SSession","Flow (Lpm)","0.3","0.3",,,,
+"StudyID","SSession","count_composite_above_threshold (mins)","215","0",,,,
+"StudyID","SSession","percent_composite_above_threshold (%)","0.15","0",,,,
+"StudyID","SSession","x_above_threshold (mins)","231","0",,,,
+"StudyID","SSession","x_percent_above_threshold (%)","0.16","0",,,,
+"StudyID","SSession","y_above_threshold(mins)","334","0",,,,
+"StudyID","SSession","y_percent_above_threshold (%)","0.23","0",,,,
+"StudyID","SSession","z_above_threshold (mins)","337","0",,,,
+"StudyID","SSession","z_percent_above_threshold (%)","0.23","0",,,,
+"StudyID","SSession","Hours of Compliance (hrs, by rolling mean)","5.78","0",,,,
+"StudyID","SSession","Active Sampling Minutes (mins)","1441","118",,,,
+"StudyID","SSession","Active Sampling Hours (hrs)","24"," 2",,,,
+"StudyID","SSession","Percent of Hours Worn (%)","25.15","44.32",,,,
+"StudyID","SSession","**SETUP**","**SETUP**","**SETUP**","**SETUP**","**SETUP**","**SETUP**","**SETUP**"
+"StudyID","SSession","File Name:","C:\Users\emollinedo\Box Sync\Guatemala Exposure Data\Scoping phase\ECM\G1_ECM00061_017_16062017_raw.CSV","","","","",""
+"StudyID","SSession","Download Date:","6/16/17","","","","",""
+"StudyID","SSession","Total Download Time (s):","1.5","","","","",""
+"StudyID","SSession","","","","","","",""
+"StudyID","SSession","Device Serial #:","ECM00061","","","","",""
+"StudyID","SSession","Date/Time Hardware:","1/2/14","","","","",""
+"StudyID","SSession","Date/Time Software:","27/01/2017","v2.0.6236.20371","","","",""
+"StudyID","SSession","Participant ID#:","","","","","",""
+"StudyID","SSession","Filter ID#:","1101102","","","","",""
+"StudyID","SSession","Participant Weight (kg)",,"","","","",""
+"StudyID","SSession","Inlet Aerosol Size:","PM2.5","","","","",""
+"StudyID","SSession","Laser Cycling Variables:Delay - Sampling time - Off time","1","3","6","","",""
+"StudyID","SSession","System Times","No cycling - Always On","","","","",""
+"StudyID","SSession","Sensor","Slope","Offset","Log Interval","High Target (ref only)","Low target (ref only)",""
+"StudyID","SSession","Nephelometer","3","6","10","","",""
+"StudyID","SSession","Temperature","1","1","30","","",""
+"StudyID","SSession","Humidity","1","0","10","","",""
+"StudyID","SSession","Inlet Pressure","4095","0","30","1280","768",""
+"StudyID","SSession","Orifice Pressure","4095","0","30","9753","9311",""
+"StudyID","SSession","Flow","","","30","0","0","0.3"
+"StudyID","SSession","Accelerometer","","","5","","",""
+"StudyID","SSession","Battery","","","60","","",""
+"StudyID","SSession","Ventilation",,,"","","",""
+"StudyID","SSession","**EQUIPMENT.LOG**","**EQUIPMENT.LOG**","**EQUIPMENT.LOG**","**EQUIPMENT.LOG**","**EQUIPMENT.LOG**","**EQUIPMENT.LOG**","**EQUIPMENT.LOG**"
+"StudyID","SSession","Button Press","16/06/2017","10:42:56",,,,
